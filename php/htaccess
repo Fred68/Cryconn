@@ -1,0 +1,5 @@
+#Prevent Users From Accessing .inc.php files in .htaccess
+<FilesMatch "\.(htaccess|htpasswd|ini|inc.php|txt|html|log|sh|inc|bak)$">
+Order Allow,Deny
+Deny from all
+</FilesMatch>
