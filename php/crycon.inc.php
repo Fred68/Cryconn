@@ -7,6 +7,7 @@ class Crycon						// Classe: connessione criptata
 	protected $errore = "";			// Messaggi di errore
 	protected $messaggio = "";		// Messaggio
 	protected $comando = "";		// Comando da eseguire
+	protected $data = "";			// Dati legati al messaggio
 	protected $timsg = "";			// Messaggio del timer (refresh)
 	var $stddbname = "crycon";		// Nome del file .db
 	var $dbpath = "db";				// Percorso (relativo) del database
@@ -21,10 +22,11 @@ class Crycon						// Classe: connessione criptata
 	var $sid = "sid";		 		// session_id
 	var $lgt = "lgt";				// log time
 	var $llg = "llg";				// last log time
+	var $ssk = "ssk";				// session symmetric key
 	//////////////////////////////////
 	var $cmdfrm = "cmd";			// per memorizzazione comando
-	var $refri = 10;				// refresh in secondi
-	var $rtmt = 25;					// timeout sessione in secondi
+	var $refri = 20;				// refresh in secondi
+	var $rtmt = 35;					// timeout sessione in secondi
 	//////////////////////////////////
 	var $db = null;					// Database
 	//////////////////////////////////
@@ -40,15 +42,15 @@ class Crycon						// Classe: connessione criptata
 		$this->debugMode = $debugmode;
 		$this->Clear();									// Cancella i messaggi di errore
 		$this->ConstructName($this->stddbname);			// Chiama l'inizializzatore
-		// error_log("Crycon construttore");
-		// $this->RenderPage();
 		}
 	protected function Clear()							// Cancella errori e messaggi
 		{
 		$this->errore = "";
 		$this->messaggio = "";
 		$this->comando = "";
+		$this->data = "";
 		$this->timsg = "...";
+		
 		}
 	public function GetError()							// Restituisce gli errori
 		{
@@ -73,7 +75,7 @@ class Crycon						// Classe: connessione criptata
 		
 		$this->cmd["ldroptb"] = "DROP TABLE IF EXISTS ".$this->logged.";";
 		//$this->cmd["ltable"] = "CREATE TABLE ".$this->logged." (".UID." INTEGER PRIMARY KEY NOT NULL, ".$this->sid." TEXT NOT NULL, ".$this->lgt." DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, ".$this->llg." DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP);";
-		$this->cmd["ltable"] = "CREATE TABLE ".$this->logged." (".UID." INTEGER PRIMARY KEY NOT NULL, ".$this->sid." TEXT NOT NULL, ".$this->lgt." INTEGER NOT NULL, ".$this->llg." INTEGER NOT NULL);";
+		$this->cmd["ltable"] = "CREATE TABLE ".$this->logged." (".UID." INTEGER PRIMARY KEY NOT NULL, ".$this->sid." TEXT NOT NULL, ".$this->ssk." TEXT, ".$this->lgt." INTEGER NOT NULL, ".$this->llg." INTEGER NOT NULL);";
 		$this->cmd["lcount"] = "SELECT COUNT(*) FROM ".$this->logged.";";
 		$this->cmd["logged"] = "SELECT DISTINCT * FROM ".$this->logged.";";
 		$this->cmd["countlgd"] = "SELECT COUNT(*) FROM ".$this->logged." WHERE ".UID."= :".UID.";";
@@ -131,11 +133,8 @@ class Crycon						// Classe: connessione criptata
 			session_unset();
 			session_destroy();
 			$this->db = null;
+			error_log("Disconnect");
 			}
-		// PROVA
-		// session_unset();
-		//session_destroy();
-		// $this->db = null;
 		return;
 		}
 	protected function CountUsers($uname, $upwd)		// Conta gli utenti con nome e hash della password. -1 se errore.
@@ -267,12 +266,10 @@ class Crycon						// Classe: connessione criptata
 			if($ttr < $this->rtmt)							// Se rimane nel timeout
 				{
 				$_SESSION[$this->llg] = time();				// Àggiorna all'ultimo refresh la variabile di sessione...
-				error_log("RefreshLoggedUser()... in time");
 				try											// ...e l'utente
 					{										// Nota: in sqlite non c'è ON UPDATE CURRENT TIMESTAMP, solo in MySql
 					$this->Connect();						// Usa INTEGER e time() di php, più semplice da confrontare
 					$stmt = $this->db->prepare($this->cmd["updlgu"]);
-					error_log($this->cmd["updlgu"]);
 					$tm = time();
 					$stmt->bindParam(':'.UID, $id);
 					$stmt->bindParam(':'.$this->llg, $tm);
@@ -280,33 +277,23 @@ class Crycon						// Classe: connessione criptata
 					if($ex == true)
 						{
 						$ok = true;							// Imposta il flag a true
-						error_log("Eseguito pdo->execute() in RefreshLoggedUser()");
 						$this->timsg = "ok";
 						}
 					else 
 						{
-						error_log("Fallito pdo->execute() in RefreshLoggedUser()");
 						$this->timsg = "errore execute()";
 						}
 					#fare Aggiornare (se necessario) le variabili di sessione LLG ecc...
 					}
 				catch(PDOException $e)
 					{
-					//$this->errore .= "Errore: ".$e->getMessage()."\n";
 					$this->timsg = "Errore: ".$e->getMessage()."\n";
-					error_log("Errore in blocco try in RefreshLoggedUser()");
 					}
 				}
 			else 
 				{
-				error_log("RefreshLoggedUser()...timeout");
-				//$this->messaggio = "TEMPO SCADUTO";
 				$this->timsg = "TEMPO SCADUTO";
 				}
-			}
-		else 
-			{
-			error_log("RefreshLoggedUser()... Is NOT Logged");
 			}
 		return $ok;
 		}
@@ -333,7 +320,6 @@ class Crycon						// Classe: connessione criptata
 			{
 			$this->Disconnect();						// ... disconnette
 			$this->messaggio = $p1." DISCONNESSO";
-			error_log("CmdClear. Già connesso: disconnesso");
 			}
 		else											// Se non connesso nella sessione...
 			{
@@ -341,12 +327,9 @@ class Crycon						// Classe: connessione criptata
 				{
 				$uid = $key = $pwdb = "";
 				$loginOk = $this->GetUserKeys($p1, $p2, $uid, $key, $pwdb);		// Controlla...
-				error_log("CmdClear. Non connesso: verifica credenziali");
 				if($loginOk == true)											// ...se credenziali corrette
 					{
 					$_SESSION[UID] = $uid;
-					error_log("CmdClear. Credenziali ok per $uid");
-					
 					$ret = false;
 					$ttot = $trfr = 0;
 					$ret = $this->CheckUser($uid, $trfr, $ttot);				// Verifica se ancora connesso
@@ -360,7 +343,6 @@ class Crycon						// Classe: connessione criptata
 						else 
 							{
 							$this->messaggio = $p1." ancora connesso";
-							
 							}
 						}
 					
@@ -370,7 +352,6 @@ class Crycon						// Classe: connessione criptata
 				else
 					{
 					$this->messaggio = $p1." UTENTE o PASSWORD ERRATI";		// Se credenziali errate...
-					error_log("CmdClear. Credenziali errate");
 					}
 				}
 				catch(PDOException $e)
@@ -383,7 +364,6 @@ class Crycon						// Classe: connessione criptata
 	protected function CheckUser($uid, &$dtrefr, &$dttot) 	// true se l'utente è connesso e nel timeout
 		{
 		$cnt = 0;										
-		error_log("CheckUser()...");
 		try
 			{
 			$this->Connect();
@@ -392,11 +372,9 @@ class Crycon						// Classe: connessione criptata
 			$stmt->execute();
 			$cnt = $stmt->fetchAll(PDO::FETCH_NUM);
 			$r = count($cnt);
-			error_log("CheckUser()...: count= ".$r);
 			if($r > 0)
 				{
 				$row = $cnt[0];			// Sceglie la prima riga, se c'è
-				error_log("count(row)= ".count($row));
 				if(count($row) == 3)	// Legge le celle delle colonne, se corrette
 					{
 					$sid = $row[0];		// Sessione		
@@ -407,19 +385,14 @@ class Crycon						// Classe: connessione criptata
 					$dttot = time() - $lgt; 
 					
 					$ok = true;
-					error_log("CheckUser()dopo execute. sid=".$sid." Dal refresh= ".$dtrefr." Dal login= ".$dttot);
-
 					#fare DA COMPLETARE Verifica se l'utente con user id è ancora connesso e nel timeout
 					}
 				}
 			}
 		catch(PDOException $e)
 			{
-			//$this->errore .= "Errore: ".$e->getMessage()."\n";
-			//$this->message = "Errore in CheckUser ";
 			$this->timsg .= "Errore: ".$e->getMessage()."\n";
 			$cnt = -1;
-			error_log("CheckUser()catch error");
 			}
 		return $cnt;
 		}
@@ -501,17 +474,24 @@ class Crycon						// Classe: connessione criptata
 			if(!$ok)
 				{
 				$this->Disconnect();
-				error_log("RefreshLoggedUser() ha restituito false");
 				}
 			}
 		else		// ...oppure no
 			{
-			error_log("CmdRefresh()...not logged user");
 			#fare FAR CHIAMARE STOP TIMER CON JSON (O FARLO DIRETTAMENTE DA JS), QUI OPPURE AD OGNI OPERAZIONE (MEGLIO!) 
 			// $this->messaggio = "Nessun utente connesso. Refresh superfluo.";
 			$this->Disconnect();
 			}
 		return true;
+		}
+	protected function GenerateRandom()					// Stringa crittograficamente sicura 512 bit, in esadecimale
+		{
+		$s = "";										// 32 byte * 8 bit = 256 bit
+		$x = openssl_random_pseudo_bytes(32);
+		$s = bin2hex($x);	// PHP 7.0: random_bytes(32). Trasforma in stringa esadecimale.
+		if(hex2bin($s) != $x)
+			$s = "ERRORE";
+		return $s;
 		}
 	// Scambio dati con il client
 	public function ReadRequest(&$p0,&$p1,&$p2)			// Legge la richiesta del POST e la mette negli argomenti. False se errata.
@@ -533,24 +513,48 @@ class Crycon						// Classe: connessione criptata
 			{
 			case CMD_LOGIN:
 				$done = $this->CmdLogin($p0,$p1,$p2);
-				error_log("ProcessRequest...login");
 				if($this->IsLogged())
 					{
 					$this->comando = ID_START;
+					$this->data = session_id();
 					}
 				break;
 			case CMD_CLEAR:
 				$done = $this->CmdClear($p0,$p1,$p2);
-				error_log("ProcessRequest...clear");
 				break;
 			case CMD_LOGOUT:
 				$done = $this->CmdLogout($p0,$p1,$p2);
-				error_log("ProcessRequest...logout");
 				$this->comando = ID_STOP;
 				break;
 			case CMD_REFRESH:
 				$done = $this->CmdRefresh($p0,$p1,$p2);
-				error_log("ProcessRequest...refresh");
+				break;
+			case CMD_COMMAND:
+				$this->comando = CMD_COMMAND;
+				$this->data = $p1;
+				break;
+			case CMD_CONNECT:
+				if($this->IsLogged())
+					{
+					$this->comando = CMD_CONNECT;		// Risposta alla richiesta di connessione
+					$aestmp = $this->GenerateRandom();	// Ottiene un aes temporaneo (hex)
+					$_SESSION[$this->ssk] = $aestmp;	// Lo memorizza prima in aes di sessione
+					//$risposta = $aestmp.session_id();	// Aggiunge session ID o timestamp o altro
+														// Lo cifra con la chiave privata + timestamp...
+					$this->data = $aestmp;				// Lo invia come risposta
+					}
+				break;
+			case CMD_AES:
+				$this->comando = CMD_AES;
+				if($_SESSION[$this->ssk] == $p1)
+					{
+					$this->data = $p1;
+					}
+				else
+					{
+					$this->data = "Errore in AES";
+					$this->Disconnect();				// Completare !!!!
+					}
 				break;
 			}
 		return $done;
@@ -591,13 +595,13 @@ class Crycon						// Classe: connessione criptata
 		else 
 			$jsn[ID_ERR] = "...";
 		$jsn[ID_LOGMSG] = $this->LoggedMessage();		// (Un)Logged
-		$jsn[ID_TIMERMSG] = $this->TimerMsg();
+		$jsn[ID_TIMERMSG] = $this->TimerMsg();			// Timer
 		if($this->IsLogged())
 			{
 			$jsn[ID_LOGGED] = "+";						// Mostra class loggedin
 			$jsn[ID_UNLOGGED] = "-";					// Nasconde class unlogged
 			$jsn[ID_TIMER] = $this->TimerValue();		// Risponde al timer
-			//$jsn[ID_TEST] = ID_EXE;					// Esegue il comando test
+			//$jsn[ID_TEST] = ID_EXE;					// Esegue il comando test [disabilitato]
 			}
 		else 
 			{
@@ -605,8 +609,38 @@ class Crycon						// Classe: connessione criptata
 			$jsn[ID_UNLOGGED] = "+";
 			$jsn[ID_TIMER] = "";
 			}
-		if(strlen($this->comando)>0)					// Comando di risposta
-			$jsn[$this->comando] = ID_EXE;
+		switch($this->comando)
+			{
+			case CMD_COMMAND:
+				{
+				$jsn[CMD_COMMAND] = "Risposta da command al messaggio: <".$this->data.">";
+				}
+				break;
+			case CMD_CONNECT:
+				{
+				$jsn[CMD_CONNECT] = $this->data;
+				}
+				break;
+			case CMD_AES:
+				{
+				$jsn[CMD_AES] = $this->data;
+				}
+				break;
+			case ID_START:
+				{
+				$jsn[$this->comando] = $this->data;
+				}
+				break;
+			default:
+				$jsn[$this->comando] = ID_EXE;
+				break;
+			}
+			
+		//CONTROLLARE !!!! $THIS->DATA SEMBRA VUOTO... VEDERE PROCESSREQUEST()
+#		ERRORE: COMPLETARE CODIFICA DI:
+#		COMANDO GENERICO: $JSN[comando] = ID_EXE
+#		COMANDO SPECIFICO: $JSN[CMD_COMMAND] = "DATI"
+			
 		echo json_encode($jsn);
 		}
 	}

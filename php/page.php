@@ -3,7 +3,6 @@ session_start();
 include_once 'const.inc.php';
 include 'php/crycon.inc.php';
 $x = new Crycon(false);
-// error_log("eseguito new Crycon");
 $po = $p1 = $p2 = "";
 $ret = $x->ReadRequest($p0, $p1, $p2);
 if(!$ret)
@@ -22,7 +21,7 @@ if(!$ret)
 	</head>
 	<body>
 		<h1>Page</h1>
-			<div>
+		<div>
 			<table class="logstat">
 				<col width="200">
 				<col width="300">
@@ -44,7 +43,12 @@ if(!$ret)
 			<button class="<?php echo ID_UNLOGGED;?>" id="<?php echo CMD_CLEAR;?>">Clear</button>			
 			<button class="<?php echo ID_UNLOGGED;?>" id="<?php echo CMD_RELOAD;?>">Reload</button>
 			<button class="<?php echo ID_LOGGED;?>" id="<?php echo CMD_LOGOUT;?>">Logout</button>
-			<button id="<?php echo ID_TEST;?>">Test</button>
+			
+		</div>
+		<div class="<?php echo ID_LOGGED;?>">
+		<p>Funzioni per l'utente:</p>
+		<button id="<?php echo ID_TEST;?>">Test</button>
+		<button id="<?php echo ID_COMMAND;?>">Command</button>
 		</div>
 	</body>
 	</html>

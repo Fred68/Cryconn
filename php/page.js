@@ -1,7 +1,7 @@
 var refresh_timer;						// Timer globale
 
 function init()							// Imposta la pagina
-	{
+	{									// Comandi associati ai pulsanti
 	$("#<?php echo CMD_LOGIN;?>").click(function(event)
 			{
 			command("<?php echo CMD_LOGIN;?>");
@@ -27,10 +27,15 @@ function init()							// Imposta la pagina
 			command("<?php echo ID_TEST;?>");
 			}
 		);
+	$("#<?php echo ID_COMMAND;?>").click(function(event)
+			{
+			command("<?php echo CMD_COMMAND;?>");
+			}
+		);
 	refresh_timer = null;				// Azzera oggetto timer
 	return;
 	}
-function stopTimer()
+function stopTimer()					// Ferma il timer
 	{
 	if(refresh_timer == null)
 		{
@@ -38,14 +43,12 @@ function stopTimer()
 		}
 	clearInterval(refresh_timer);
 	refresh_timer = null;
-	alert("stop timer");
 	}
-function startTimer()
+function startTimer()					// Avvia il timer di refresh
 	{
 	if(refresh_timer == null)
 		{
 		refresh_timer = setInterval(refreshRequest, "<?php echo $x->refri; ?>");
-		alert("start timer");
 		}
 	else
 		{
@@ -72,17 +75,26 @@ function command(cmd)					// Esegue un comando
 		case "reload":
 			location.reload(true);
 			break;
-		case "<?php echo ID_TEST;?>":				// Comandi dal sito
-			alert("Test!");
+		case "<?php echo ID_TEST;?>":				// Comando di prova
+			alert("sid= "+sessionStorage.sid);
 			break;
-		case "<?php echo ID_START;?>":
+		case "<?php echo ID_START;?>":				// Avvio timer + richiesta di connessione
 			startTimer();
+			sendRequest(url,"<?php echo CMD_CONNECT;?>","","");				// Richiesta di connessione				
 			break;
-		case "<?php echo ID_STOP;?>":
+		case "<?php echo ID_STOP;?>":				// Stop timer
 			stopTimer();
 			break;
+		case "<?php echo CMD_COMMAND;?>":			// Command
+			sendRequest(url,cmd,"messaggio","");
+			break;
+		case "<?php echo CMD_CONNECT;?>":			// Connect
+			sendRequest(url,cmd,"","");
+			break;
+		case "<?php echo CMD_AES;?>":				// AES
+			sendRequest(url,cmd,sessionStorage.aes,"");
+			break;
 		}
-	
 	}
 $(document).ready(function()			// Dopo caricamento della pagina
 		{
@@ -90,7 +102,7 @@ $(document).ready(function()			// Dopo caricamento della pagina
 		showHideUnLogged();				// Mostra/nasconde se (un)logged + timer restart dopo refresh
 		}
 	); 
-function refreshRequest()					// Esegue refresh del timer
+function refreshRequest()				// Esegue refresh del timer
 	{
 	sendRequest("<?php echo $_SERVER['REQUEST_URI']; ?>",'refresh',"","");
 	}
@@ -125,24 +137,55 @@ function processJsonData(data)			// Analizza risposta del server conseguente all
 	datiObj = JSON.parse(data);
 	$.each(datiObj,function(i,o)
 			{
-			if(o == '+')				// Mostra oggetti di classe .i
+			switch(i)
 				{
-				$("."+i).show();
+				case '<?php echo CMD_COMMAND;?>':		// Risposta del server a Command
+					{
+					alert(i + ": " + o);
+					}
+					break;
+				case '<?php echo CMD_CONNECT;?>':		// Risposta del server a Connect: la chiave aes
+					{									// (crittografata a doppia chiave: DA FARE)
+					sessionStorage.aes = o;				// La salva nella sessione
+					command('<?php echo CMD_AES;?>');	// Esegue il comando di risposta all'aes
+					//alert(i + ": " + o);
+					//sendRequest("<?php echo $_SERVER['REQUEST_URI']; ?>",'<?php echo CMD_AES;?>',o,"");
+					}
+					break;
+				case '<?php echo CMD_AES;?>':
+					{
+					alert(i + ": " + o);
+					}
+					break;
+				case "<?php echo ID_START;?>":			// Cattura il comando start (con argomento)
+					{
+					sessionStorage.sid = o;				// Imposta la session id
+					command(i);							// Esegue il comando start
+					}
+					break;
+				default:
+					{
+					if(o == '+')				// Mostra oggetti di classe .i
+						{
+						$("."+i).show();
+						}
+					else if(o == '-')			// Nasconde oggetti di classe .i
+						{
+						$("."+i).hide();
+						}
+					else if(o == '*')			// Esegue il comando i (senza parametri)
+						{
+						command(i);
+						}
+					else
+						$("#"+i).text(o);		// Imposta il testo dell'oggetto #i al valore o
+					}
+					break;
 				}
-				
-			else if(o == '-')			// Nasconde oggetti di classe .i
-				{
-				$("."+i).hide();
-				}
-			else if(o == '*')			// Esegue il comando i
-				{
-				command(i);
-				}
-			else
-				$("#"+i).text(o);		// Imposta il testo dell'oggetto #i al valore o
 			}
 		)
 	}
+
 function showHideUnLogged()
 	{
 	$l = "<?php echo $x->IsLogged(); ?>";
@@ -158,4 +201,14 @@ function showHideUnLogged()
 		$(".<?php echo ID_UNLOGGED;?>").show();
 		}
 	
+	}
+
+function hex2bin(hex)
+	{
+    var bytes = [], str;
+
+    for(var i=0; i< hex.length-1; i+=2)
+        bytes.push(parseInt(hex.substr(i, 2), 16));
+
+    return String.fromCharCode.apply(String, bytes);    
 	}

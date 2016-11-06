@@ -23,10 +23,16 @@ define('ID_EXE',"*");
 define('ID_TEST',"test");
 define('ID_START',"start");
 define('ID_STOP',"stop");
+define('ID_COMMAND',"command");
+define('ID_CONNECT',"connect");
 
 define('CMD_LOGIN',"login");
 define('CMD_CLEAR',"clear");
 define('CMD_LOGOUT',"logout");
 define('CMD_REFRESH',"refresh");
 define('CMD_RELOAD',"reload");
+define('CMD_COMMAND',"cmd");
+define('CMD_RQCONNECT',"rqcnt");
+define('CMD_CONNECT',"cnt");
+define('CMD_AES',"aes");
 
