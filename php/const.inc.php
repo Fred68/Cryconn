@@ -8,6 +8,14 @@ define('P2',"pp2");
 // Nomi per accesso al database
 define('UID',"id");
 
+// Costanti
+define('IVSIZE',16);		// 16 B = 128 b
+define('IVSIZE64',24);		// 16 * 4/3 arrotondato al multiplo di 4 superiore
+define('AESSIZE',32);		// 32 * 8 = 256 bit
+define('AESSIZE64',44);		// 32 * 8 = 256 bit
+
+define('TESTO_PROVA',"Testo di prova per verificare il funzionamento della crittografia");
+
 // Valori possibili per lo stato della connessione
 
 

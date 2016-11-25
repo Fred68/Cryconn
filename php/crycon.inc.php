@@ -30,6 +30,8 @@ class Crycon						// Classe: connessione criptata
 	//////////////////////////////////
 	var $db = null;					// Database
 	//////////////////////////////////
+	var $caratteri;					// Array con i caratteri ammessi
+	//////////////////////////////////
 	
 	protected $cmd = array();		// Array con i comandi SQL
 	
@@ -40,6 +42,7 @@ class Crycon						// Classe: connessione criptata
 		{
 		$this->refri = $this->refri * 1000;
 		$this->debugMode = $debugmode;
+		$this->caratteri = array_merge(range('A','Z'), range('a','z'), range('0','9'));
 		$this->Clear();									// Cancella i messaggi di errore
 		$this->ConstructName($this->stddbname);			// Chiama l'inizializzatore
 		}
@@ -133,7 +136,6 @@ class Crycon						// Classe: connessione criptata
 			session_unset();
 			session_destroy();
 			$this->db = null;
-			error_log("Disconnect");
 			}
 		return;
 		}
@@ -484,16 +486,63 @@ class Crycon						// Classe: connessione criptata
 			}
 		return true;
 		}
-	protected function GenerateRandom()					// Stringa crittograficamente sicura 512 bit, in esadecimale
+	protected function GenerateSeq($nbyte)
 		{
-		$s = "";										// 32 byte * 8 bit = 256 bit
-		$x = openssl_random_pseudo_bytes(32);
-		$s = bin2hex($x);	// PHP 7.0: random_bytes(32). Trasforma in stringa esadecimale.
-		if(hex2bin($s) != $x)
-			$s = "ERRORE";
+		$s = "";
+		$n = 1;
+		for($i=0; $i<$nbyte; $i++)
+			{
+			$s = $s.(string)$n;
+			$n++;
+			if($n>9)
+				$n = 0;
+			}
 		return $s;
 		}
-	// Scambio dati con il client
+	protected function GenerateRndSeq($nbyte)
+		{
+		$alph = implode('',range(' ','~'));
+		$s = "";
+		$n = 1;
+		for($i=0; $i<$nbyte; $i++)
+			{
+			$s = $s.$alph{$this->crypto_rand_secure(0,strlen($alph)-1)};
+			}
+		return $s;
+		}
+	function crypto_rand_secure($min, $max)	// From php.net
+		{
+		$range = $max - $min;
+		if ($range == 0) return $min;
+		$log = log($range, 2);
+		$bytes = (int) ($log / 8) + 1;		// length in bytes
+		$bits = (int) $log + 1; 			// length in bits
+		$filter = (int) (1 << $bits) - 1;	// set all lower bits to 1
+		do
+			{
+			$rnd = hexdec(bin2hex(openssl_random_pseudo_bytes($bytes, $s)));
+			$rnd = $rnd & $filter;			// discard irrelevant bits
+			}
+		while($rnd >= $range);
+		return $min + $rnd;
+		}
+	protected function GenerateRandom($nbyte)			// Stringa crittograficamente sicura, in base64
+		{
+		$s = "";
+		//$x = $this->GenerateSeq($nbyte);				// Per PROVA
+		$x = $this->GenerateRndSeq($nbyte);				// Casuale
+		$s = base64_encode($x);
+		return $s;
+		}
+	protected function GenerateIV()						// IV in base64
+		{
+		return $this->GenerateRandom(IVSIZE);
+		}
+	protected function GenerateAES()
+		{
+		return $this->GenerateRandom(AESSIZE);			// AES in base64
+		}
+	
 	public function ReadRequest(&$p0,&$p1,&$p2)			// Legge la richiesta del POST e la mette negli argomenti. False se errata.
 		{
 		$ok = false;
@@ -506,42 +555,80 @@ class Crycon						// Classe: connessione criptata
 			}
 		return $ok;
 		}
+	protected function EncryptMessage($x)
+		{
+		$iv64 = $this->GenerateIV();
+		$iv = base64_decode($iv64);
+		$method = "aes-256-cbc";
+		$aes = base64_decode($_SESSION[$this->ssk]);
+		$enc = openssl_encrypt($x, $method, $aes, false, $iv);
+		return $iv64.$enc;
+		}
+	protected function DecryptMessage($x)
+		{
+		$iv64 = substr($x,0,IVSIZE64);
+		$enc = substr($x, IVSIZE64);
+		$iv = base64_decode($iv64);
+		//$iv8 = utf8_encode ($iv);
+		$method = "aes-256-cbc";
+		$aes = base64_decode($_SESSION[$this->ssk]);
+		//$enc1 = openssl_encrypt(TESTO_PROVA, $method, $aes, false, $iv);		// test
+		$dec  = openssl_decrypt($enc, $method, $aes, false, $iv);
+		//$dec1 = openssl_decrypt($enc1, $method, $aes, false, $iv);
+		//error_log("x=".$x."\nenc =".$enc."\nenc1=".$enc1."\niv=".$iv."\niv64=".$iv64."\niv8=".$iv8."\naes=".$aes."\ndec=".$dec."\ndec1=".$dec1);
+		
+		//$s = "";
+		//$s.= "\nx    =".substr($x,0,5)."...";
+		//$s.= "\niv64 =".substr($iv64,0,5)."..."; 
+		//$s.= "\nenc  =".substr($enc,0,5)."...";
+		//$s.= "\nenc1 =".substr($enc1,0,5)."...";
+		//$s.= "\niv   =".$iv;
+		//$s.= "\naes  =".$aes;
+		//$s.= "\ndec  =".substr($dec,0,10)."...";
+		//$s.= "\ndec1=".$dec1;
+		$s = 'Messaggio decodificato: '.$dec;
+		return $s;
+		}
 	public function ProcessRequest($p0,$p1,$p2)			// Analizza la richiesta e la esegue
 		{
 		$done = false;
 		switch($p0)
 			{
-			case CMD_LOGIN:
+			case CMD_LOGIN:								// Login
 				$done = $this->CmdLogin($p0,$p1,$p2);
-				if($this->IsLogged())
+				if($this->IsLogged())					// Se connesso,
 					{
-					$this->comando = ID_START;
-					$this->data = session_id();
+					$this->comando = ID_START;			// Richiede start timer in js
+					$this->data = session_id();			// invia anche la sid
 					}
 				break;
 			case CMD_CLEAR:
 				$done = $this->CmdClear($p0,$p1,$p2);
 				break;
 			case CMD_LOGOUT:
-				$done = $this->CmdLogout($p0,$p1,$p2);
-				$this->comando = ID_STOP;
+				$done = $this->CmdLogout($p0,$p1,$p2);	// Esegue logout
+				$this->comando = ID_STOP;				// e richiede stop timer
 				break;
 			case CMD_REFRESH:
 				$done = $this->CmdRefresh($p0,$p1,$p2);
 				break;
 			case CMD_COMMAND:
 				$this->comando = CMD_COMMAND;
-				$this->data = $p1;
+				$msg = $this->DecryptMessage($p1);
+				// Elabora il messaggio e prepara la risposta
+				$res = "Elaborato messaggio:\n".$msg;
+				//
+				$this->data = $this->EncryptMessage($res);
 				break;
-			case CMD_CONNECT:
+			case CMD_CONNECT:							// Connessione criptata
 				if($this->IsLogged())
 					{
 					$this->comando = CMD_CONNECT;		// Risposta alla richiesta di connessione
-					$aestmp = $this->GenerateRandom();	// Ottiene un aes temporaneo (hex)
-					$_SESSION[$this->ssk] = $aestmp;	// Lo memorizza prima in aes di sessione
-					//$risposta = $aestmp.session_id();	// Aggiunge session ID o timestamp o altro
-														// Lo cifra con la chiave privata + timestamp...
-					$this->data = $aestmp;				// Lo invia come risposta
+					$aestmp = $this->GenerateAES();		// Ottiene un aes temporaneo in base64
+					$_SESSION[$this->ssk] = $aestmp;	// Memorizza l'aes di sessione (single symm key), in base64
+					$risposta = $aestmp.session_id();	// Aggiunge session ID
+														// Lo cifra con doppia chiave + timestamp... DA FARE
+					$this->data = $risposta;			// Lo invia come risposta
 					}
 				break;
 			case CMD_AES:
@@ -601,7 +688,6 @@ class Crycon						// Classe: connessione criptata
 			$jsn[ID_LOGGED] = "+";						// Mostra class loggedin
 			$jsn[ID_UNLOGGED] = "-";					// Nasconde class unlogged
 			$jsn[ID_TIMER] = $this->TimerValue();		// Risponde al timer
-			//$jsn[ID_TEST] = ID_EXE;					// Esegue il comando test [disabilitato]
 			}
 		else 
 			{
@@ -613,17 +699,17 @@ class Crycon						// Classe: connessione criptata
 			{
 			case CMD_COMMAND:
 				{
-				$jsn[CMD_COMMAND] = "Risposta da command al messaggio: <".$this->data.">";
+				$jsn[CMD_COMMAND] = $this->data;		// Invia i dati criptati preparati prima
 				}
 				break;
 			case CMD_CONNECT:
 				{
-				$jsn[CMD_CONNECT] = $this->data;
+				$jsn[$this->comando] = $this->data;
 				}
 				break;
 			case CMD_AES:
 				{
-				$jsn[CMD_AES] = $this->data;
+				$jsn[$this->comando] = $this->data;
 				}
 				break;
 			case ID_START:

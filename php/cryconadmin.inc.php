@@ -15,6 +15,7 @@ class CryconAdmin extends Crycon				// Classe: connessione criptata da amministr
 		
 		array_push($this->utenti, array("pippo", sha1("antani"),"12345678901234567890123456789012","apQ127"));
 		array_push($this->utenti, array("pluto", sha1("blinda"),"21098765432109876543210987654321","98zpR15"));
+		array_push($this->utenti, array("a", sha1("a"),"21098765432109876543210987654321","98zpR15"));
 		
 		$msgecho .= "<b>Utenti</b><p>";
 		foreach ($this->utenti as $x)

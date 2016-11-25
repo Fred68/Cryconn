@@ -1,0 +1,67 @@
+##############################################################################
+#
+#		DA FARE
+#
+#
+#	v	Fatto
+#	.	Non fatto
+#	->	Da fare
+#	?	Verificare
+#	x	Annullato
+#	**	In corso
+#
+#
+##############################################################################
+#
+#
+#	IMPORTANTE:
+#	JS non è sicuro. Un attacco MIM potrebbe alterare il codice js e intercettare la chiave AES
+#	con la quale poi leggere i dati sul server.
+#	USARE CHIAVE ASIMMETRICA (RSA)
+#	Con la chiave asimmetrica, il server scambia ogni volta una nuova chiave AES
+#	La chiave AES è valida per una sola sessione (o per un tempo limitato)
+#	ma permette scambio dati valoce (RSA è lento)
+#
+#
+#
+#
+#	v	Eseguire ShowPage soltanto una volta (al login e dopo il login). Gli altri comandi vanno eseguiti attraverso xlmhttprequest
+#
+#	?	Aggiungere controllo del timeout !!!
+#
+#	?	Correggere messaggi refresh, per cancellare messaggio ed errore precedenti.
+#
+#	?	Separare i messaggi del refresh, in campo html diverso da quello del messaggio, se no lo cancella subito
+#
+#	?	Ad ogni refresh, CONTROLLARE IL DATABASE, se l'utente è connesso. 
+#
+#	?	Prima di eseguire il Clear Logged, verificare che abbia raggiunto il timeout.
+#
+#	?	Attivare e disattivare il timer di refresh se login effettuato o no. Fatto in base a comando in risposta del server.
+#
+#	.	Aggiungere poi un secondo timer per refresh locale della pagina
+#
+#	v	Usare direttamente include 'pagine.php' per mostrarla, senza dover leggere il file
+#
+#	.	ATTENZIONE: RIPULIRE (sanitize) i POST[] prima di utilizzarli, contro sql injection.
+#
+#	.	Vedere cosa fare con sha1(password), dovrebbe contenere solo caratteri alfanumerici
+#		
+#	.	Spostare tutti i nomi delle variabili di sessione nelle costanti
+#
+#	.	Completare script.php con caricamento script da cdn o locale
+#
+#	v	Inserire la chiave AES e salvarla in locale.
+#		Usare inizialmente localStorage (insicuro !!!) o, meglio, sessionStorage (non molto sicuro)
+#		
+#	.	Studiare due coppie di chiavi asimmetriche, per lettura e scrittura in un senso e nell'altro !
+#
+#	.	Successivamente, non usare localStorage o sessionStorage.
+#		Provare download link e Blob per salvare i dati in un file locale 
+#		Registrare in localStorage nome completo del file. Poi:
+#		Ripristinare il nome completo del file.
+#		Se nullo: chiederlo con un prompt.
+#		Leggere il contenuto del file.
+#		Se manca: richiedere dall'inizio.
+#
+##############################################################################

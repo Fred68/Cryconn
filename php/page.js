@@ -29,11 +29,22 @@ function init()							// Imposta la pagina
 		);
 	$("#<?php echo ID_COMMAND;?>").click(function(event)
 			{
+			p1 = "<?php echo TESTO_PROVA;?>";
 			command("<?php echo CMD_COMMAND;?>");
 			}
 		);
 	refresh_timer = null;				// Azzera oggetto timer
+	ALPH = Caratteri(' ','~');
 	return;
+	}
+function Caratteri(da,a)
+	{
+	var s = "";
+	for(i=da.charCodeAt(0); i<=a.charCodeAt(0); i++)
+		{
+		s += String.fromCharCode(i);
+		}
+	return s;
 	}
 function stopTimer()					// Ferma il timer
 	{
@@ -76,7 +87,7 @@ function command(cmd)					// Esegue un comando
 			location.reload(true);
 			break;
 		case "<?php echo ID_TEST;?>":				// Comando di prova
-			alert("sid= "+sessionStorage.sid);
+			alert("sid= "+sessionStorage.sid +"\n aes= "+CryptoJS.enc.Utf8.stringify(CryptoJS.enc.Base64.parse(sessionStorage.aes)));
 			break;
 		case "<?php echo ID_START;?>":				// Avvio timer + richiesta di connessione
 			startTimer();
@@ -86,7 +97,10 @@ function command(cmd)					// Esegue un comando
 			stopTimer();
 			break;
 		case "<?php echo CMD_COMMAND;?>":			// Command
-			sendRequest(url,cmd,"messaggio","");
+			{
+			messaggio = EncryptMessage(p1,sessionStorage.aes);
+			sendRequest(url,cmd,messaggio,"");
+			}
 			break;
 		case "<?php echo CMD_CONNECT;?>":			// Connect
 			sendRequest(url,cmd,"","");
@@ -131,6 +145,96 @@ function sendRequest(url,p0,p1,p2)		// Invia richiesta xmlhttprequest al server
 					}
 			)
 	}
+
+function DecryptMessage(msg,aes64)
+	{
+	iv64 = msg.substr(0,'<?php echo IVSIZE64;?>');
+	enc = msg.substr('<?php echo IVSIZE64;?>');
+	iv = CryptoJS.enc.Utf8.parse(CryptoJS.enc.Utf8.stringify(CryptoJS.enc.Base64.parse(iv64)));
+	
+	key= CryptoJS.enc.Utf8.parse(CryptoJS.enc.Utf8.stringify(CryptoJS.enc.Base64.parse(aes64)));
+	opt = { iv: iv, mode: CryptoJS.mode.CBC, padding: CryptoJS.pad.Pkcs7 };
+	//enccfr = CryptoJS.AES.encrypt("<?php echo TESTO_PROVA;?>", key, opt);
+	//deccfr = CryptoJS.AES.decrypt(enccfr, key, opt);
+	//decstrcfr = deccfr.toString(CryptoJS.enc.Utf8);
+	dec = CryptoJS.AES.decrypt(enc, key, opt);
+	decstr = dec.toString(CryptoJS.enc.Utf8);
+	return decstr;
+	}
+function GenerateRndSeq(len)
+	{
+	s = "";
+	nch = ALPH.length;
+	// CryptoJS.lib.WordArray.random(len) genera i numer usando Math.random, crittograficamente non sicuro
+	// window.crypto.getRandomValues non è implementato su tutti i browser
+	// Si genera in modo non sicuro solo l'iv, non la chiave.
+	// Per ora implemento banalmente
+	n = 0;
+	for(i=0; i<len; i++)
+		{
+		n = Math.floor(Math.random()*nch);
+		x = ALPH.charAt(n);
+		s += x;
+		}
+	return s;
+	}
+function GenerateSeq(len)
+	{
+	s = "";
+	nch = ALPH.length;
+	n = 0;
+	for(i=0; i<len; i++)
+		{
+		x = ALPH.charAt(n);
+		s += x;
+		n++;
+		if(n > nch-1)
+			n=0;
+		}
+	return s;
+	}
+function GenerateRandom(len)
+	{
+	s = "";
+	//s = GenerateSeq(len);
+	s = GenerateRndSeq(len);
+	return s;
+	}
+function EncryptMessage(msg,aes64)
+	{
+	//txt = "";
+	var ivstr = GenerateRandom('<?php echo IVSIZE;?>');
+	//var ivstr = GenerateRndSeq('<?php echo IVSIZE;?>');
+	//txt += "ivstr="+ ivstr + '\n';
+
+	var iv = CryptoJS.enc.Utf8.parse(ivstr);
+	//txt += "iv(utf8)="+ iv + '\n';
+	
+	var iv64 = CryptoJS.enc.Base64.stringify(iv);
+	//txt += "iv64="+iv64+'\n';
+
+	//var prova = CryptoJS.enc.Utf8.stringify(iv);
+	//var prova = iv.toString(CryptoJS.enc.Utf8);
+	//var prova64= CryptoJS.enc.Base64.stringify(prova);
+	//var prova64= CryptoJS.enc.Base64(prova);
+	//txt += "prova="+prova+'\n';
+	
+	//var key = CryptoJS.enc.Utf8.stringify(CryptoJS.enc.Base64.parse(sessionStorage.aes))
+	//var key = CryptoJS.enc.Utf8.parse(CryptoJS.enc.Base64.parse(sessionStorage.aes));
+	key= CryptoJS.enc.Utf8.parse(CryptoJS.enc.Utf8.stringify(CryptoJS.enc.Base64.parse(aes64)));
+	
+	//txt += "aes="+key+'\n';
+	
+	
+	var opt = { iv: iv, mode: CryptoJS.mode.CBC, padding: CryptoJS.pad.Pkcs7 };
+	
+	var enc = CryptoJS.AES.encrypt(msg, key, opt);
+	//txt += "enc="+enc+'\n';
+	
+	//alert(txt);
+	return iv64.concat(enc);
+	}
+
 function processJsonData(data)			// Analizza risposta del server conseguente alla richiesta 
 	{
 	$msg = "";
@@ -141,20 +245,35 @@ function processJsonData(data)			// Analizza risposta del server conseguente all
 				{
 				case '<?php echo CMD_COMMAND;?>':		// Risposta del server a Command
 					{
-					alert(i + ": " + o);
+					decstr = DecryptMessage(o,sessionStorage.aes);
+					alert("Risposta= "+decstr);
 					}
 					break;
-				case '<?php echo CMD_CONNECT;?>':		// Risposta del server a Connect: la chiave aes
-					{									// (crittografata a doppia chiave: DA FARE)
-					sessionStorage.aes = o;				// La salva nella sessione
-					command('<?php echo CMD_AES;?>');	// Esegue il comando di risposta all'aes
-					//alert(i + ": " + o);
-					//sendRequest("<?php echo $_SERVER['REQUEST_URI']; ?>",'<?php echo CMD_AES;?>',o,"");
+				case '<?php echo CMD_CONNECT;?>':			// Risposta del server a Connect: la chiave aes
+					{										// (crittografata a doppia chiave: DA FARE)
+					//t64 = o.substr(0,'<?php echo AESSIZE64;?>');	// aes in base 64
+					//taes = CryptoJS.enc.Base64.parse(o);			// aes da base64 a byte (?)
+					//sessionStorage.aes = CryptoJS.enc.Utf8.stringify(taes);	// aes
+					sessionStorage.aes = o.substr(0,'<?php echo AESSIZE64;?>');		// Salva l'aes base64 nella sessione
+					if(o.substr('<?php echo AESSIZE64;?>') != sessionStorage.sid)	// Verifica che l'sid corrisponda
+						{
+						alert("sid not matching");
+						}
+					else
+						{
+						command('<?php echo CMD_AES;?>');	// Esegue il comando di risposta all'aes
+						}
 					}
 					break;
 				case '<?php echo CMD_AES;?>':
 					{
-					alert(i + ": " + o);
+					if(o != sessionStorage.aes)
+						alert("aes errato");
+					else
+						{
+						xx = CryptoJS.enc.Utf8.stringify(CryptoJS.enc.Base64.parse(o));
+						alert(i + "(from base64): " + xx);
+						}
 					}
 					break;
 				case "<?php echo ID_START;?>":			// Cattura il comando start (con argomento)
@@ -202,7 +321,11 @@ function showHideUnLogged()
 		}
 	
 	}
-
+function encode(txt)
+	{
+	aes = hex2bin(sessionStorage.aes);
+	
+	}
 function hex2bin(hex)
 	{
     var bytes = [], str;
