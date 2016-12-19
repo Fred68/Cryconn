@@ -1,0 +1,65 @@
+Hello,
+
+a login system with data encryption has been developed, still not completely debugged yet.
+It is based on php, jQuery and a sqlite database.
+
+The source is on github at this link [DATA TO BE LOADED ON GITHUB YET].
+A test page is here http://fred68.altervista.org/test/ , go to main link.
+Test users are (username, password): (a, a), (pippo, antani) and (pluto, blinda).
+
+The system uses some libraries for encryption:
+openssl in php
+...
+
+
+
+
+
+
+
+
+
+
+Hello,
+
+a preliminary version of a login system with data encryption has been partially developed (see previous articles).
+It is based on php, jQuery and a small sqlite database.
+
+The source is on github at this link: https://github.com/Fred68/Cryconn.
+
+A test page is here http://fred68.altervista.org/test/ , go to main link.
+Test users are (username, password): (a, a), (pippo, antani) and (pluto, blinda).
+
+Description
+– The project is made in php at server side
+– Main files (php and js scripts) are in a subdirectory protected by .htaccess
+– The database is sqlite, for the sake of simplicity, containing a table with usernames, password hash and (in the future) public and private key pairs, along with other data, in the future (user data, mysql password…)
+
+– Communication to the server is made by jQuery ajax requests, with data in json format.
+– open_ssl is used at php side, CryptoJS at client side, for encryption.
+
+Process
+– When a user logs in, the username and the password, the latter hashed with sha1(), are sent and checked against table records.
+– If they match, the user id and other data (session id, log time and last refresh time) are added to a logged users table, to avoid multiple login with the same id. Some session variables are set.
+– A timer is started, in js script, sending a refresh request at constant time intervals.
+– If a refresh request is not sent within a certain time (i.e. connection lost), the next operation will be refused by the server and the user will be logged out. No timer or cron is used on php server side.
+– A second login of the same user from another session is not possible, unless the first login refresh timeout has expired.
+– After a successful login, a connection is requested. The server creates a cryptographically secure eas key (a string), converts it to base64, stores and sends it to the client.
+– The client stores it in session variable.
+– Messages, both directions, are encrypted with aes key and a random iv, sent along with the encrypted message, both encoded in base64 after encryption. On js side the iv is generated with a random (not secure) generator.
+– A test is made clicking on Command button, a message and a response, encrypted, are exchanged.
+
+Safety issues
+– Password is hashed, but an attacker could intercept and use the hash to login or to logout other users.
+– No sanitizing is made on post data [to be done in the future]
+– Random keys bytes are picked from a limited length alphabet, but the nubers are from a cryptographically secure random generator (at php side).
+– Aes is saved in session data, but it’s changed every session.
+– The aes is sent once per session, but not encrypted. It must be encrypted with public and private key pair [to be done in the future]
+– User data are in a sqlite database, unencrypted. The file could be stolen.
+– A MITM could intercept the communication and change the data.
+– A MITM could intercept the communication and change the js program, before it is received by the client.
+– A malware could alterate js or the browser.
+
+ 
+
+Other work is needed, first of all the asymmetric encryption.

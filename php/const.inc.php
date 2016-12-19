@@ -13,6 +13,7 @@ define('IVSIZE',16);		// 16 B = 128 b
 define('IVSIZE64',24);		// 16 * 4/3 arrotondato al multiplo di 4 superiore
 define('AESSIZE',32);		// 32 * 8 = 256 bit
 define('AESSIZE64',44);		// 32 * 8 = 256 bit
+define('RSAKEYSIZE',1024);	// 512,1024,2048
 
 define('TESTO_PROVA',"Testo di prova per verificare il funzionamento della crittografia");
 
@@ -43,4 +44,4 @@ define('CMD_COMMAND',"cmd");
 define('CMD_RQCONNECT',"rqcnt");
 define('CMD_CONNECT',"cnt");
 define('CMD_AES',"aes");
-
+define('CMD_AESPK',"aespk");

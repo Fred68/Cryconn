@@ -10,7 +10,7 @@ class Crycon						// Classe: connessione criptata
 	protected $data = "";			// Dati legati al messaggio
 	protected $timsg = "";			// Messaggio del timer (refresh)
 	var $stddbname = "crycon";		// Nome del file .db
-	var $dbpath = "db";				// Percorso (relativo) del database
+	var $dbpath = "db";				// Percorso (relativo) del database e del file rsa
 	//////////////////////////////////
 	var $users = "users";			// Nome tabella users e nomi dei campi:...
 	var $usrname = "usrname";		// nome utente del login
@@ -32,11 +32,9 @@ class Crycon						// Classe: connessione criptata
 	//////////////////////////////////
 	var $caratteri;					// Array con i caratteri ammessi
 	//////////////////////////////////
-	
 	protected $cmd = array();		// Array con i comandi SQL
-	
 	#fare AGGIUNGERE VARIABILE CON LO STATO DOPO L'ULTIMA OPERAZIONE; NON USARE I MESSAGGI; VALORI: IN COSTANTI
-	
+	#fare SANITIZE dei dati del POST, prima di usarli per un comando su database o altro. 
 	// Dati principali
 	public function __construct($debugmode = false)		// Costruttore
 		{
@@ -109,8 +107,6 @@ class Crycon						// Classe: connessione criptata
 		if($this->debugMode === true)
 			echo $msgecho; 
 		}
-	// Operazioni su database e stato
-	//
 	protected function Connect()						// Apre la connessione (crea il database, se non esiste)
 		{
 		$ok = false;
@@ -229,7 +225,6 @@ class Crycon						// Classe: connessione criptata
 			$stmt->bindParam(':'.$this->llg,$tm);
 			
 			$ok = $stmt -> execute();
-			//$ok = true;
 			}
 		catch(PDOException $e)
 			{
@@ -252,7 +247,6 @@ class Crycon						// Classe: connessione criptata
 				}
 			else 
 				{
-				//$this->errore .= "Disconnesso da altro utente\n";
 				$this->messaggio .= "Disconnesso da altro utente\n";
 				}
 			}
@@ -347,9 +341,7 @@ class Crycon						// Classe: connessione criptata
 							$this->messaggio = $p1." ancora connesso";
 							}
 						}
-					
 					#fare ATTENZIONE: Disconnect() solo se ok...? VERIFICARE CHE COSA FARE !
-					
 					}
 				else
 					{
@@ -400,7 +392,7 @@ class Crycon						// Classe: connessione criptata
 		}
 	protected function CmdLogin($p0,$p1,$p2)			// Esegue login
 		{
-		#fare SE LOGIN CON UTENTE GIA` CONNESSO, IL TIMER PARTE LO STESSO
+		#fare SE LOGIN CON UTENTE GIA` CONNESSO, IL TIMER PARTE LO STESSO? Correggere
 		#fare SE REFRESH CON UTENTE DISCONNESSO DA ALTRO UTENTE, IL TIMER RESTA ATTIVO.
 		#fare METTERE UN CAMPO PHP IN JS CHE VERFICA SEMPRE SE DISATTIVARE IL TIMER !
 		if($this->IsLogged())
@@ -443,7 +435,6 @@ class Crycon						// Classe: connessione criptata
 			else
 				{
 				$this->messaggio = "UTENTE ".$lg." GIA` CONNESSO";
-				//$this->Disconnect();
 				}
 			}
 		else 
@@ -471,8 +462,6 @@ class Crycon						// Classe: connessione criptata
 		if(isset($_SESSION[UID]) && isset($_SESSION[$this->usrname]))	// se login effettuato...
 			{
 			$ok = $this->RefreshLoggedUser();
-			// $_SESSION[$this->llg] = time();
-			// COMPLETARE !!!
 			if(!$ok)
 				{
 				$this->Disconnect();
@@ -481,7 +470,6 @@ class Crycon						// Classe: connessione criptata
 		else		// ...oppure no
 			{
 			#fare FAR CHIAMARE STOP TIMER CON JSON (O FARLO DIRETTAMENTE DA JS), QUI OPPURE AD OGNI OPERAZIONE (MEGLIO!) 
-			// $this->messaggio = "Nessun utente connesso. Refresh superfluo.";
 			$this->Disconnect();
 			}
 		return true;
@@ -510,7 +498,7 @@ class Crycon						// Classe: connessione criptata
 			}
 		return $s;
 		}
-	function crypto_rand_secure($min, $max)	// From php.net
+	protected function crypto_rand_secure($min, $max)	// From php.net
 		{
 		$range = $max - $min;
 		if ($range == 0) return $min;
@@ -542,7 +530,6 @@ class Crycon						// Classe: connessione criptata
 		{
 		return $this->GenerateRandom(AESSIZE);			// AES in base64
 		}
-	
 	public function ReadRequest(&$p0,&$p1,&$p2)			// Legge la richiesta del POST e la mette negli argomenti. False se errata.
 		{
 		$ok = false;
@@ -569,23 +556,9 @@ class Crycon						// Classe: connessione criptata
 		$iv64 = substr($x,0,IVSIZE64);
 		$enc = substr($x, IVSIZE64);
 		$iv = base64_decode($iv64);
-		//$iv8 = utf8_encode ($iv);
 		$method = "aes-256-cbc";
 		$aes = base64_decode($_SESSION[$this->ssk]);
-		//$enc1 = openssl_encrypt(TESTO_PROVA, $method, $aes, false, $iv);		// test
 		$dec  = openssl_decrypt($enc, $method, $aes, false, $iv);
-		//$dec1 = openssl_decrypt($enc1, $method, $aes, false, $iv);
-		//error_log("x=".$x."\nenc =".$enc."\nenc1=".$enc1."\niv=".$iv."\niv64=".$iv64."\niv8=".$iv8."\naes=".$aes."\ndec=".$dec."\ndec1=".$dec1);
-		
-		//$s = "";
-		//$s.= "\nx    =".substr($x,0,5)."...";
-		//$s.= "\niv64 =".substr($iv64,0,5)."..."; 
-		//$s.= "\nenc  =".substr($enc,0,5)."...";
-		//$s.= "\nenc1 =".substr($enc1,0,5)."...";
-		//$s.= "\niv   =".$iv;
-		//$s.= "\naes  =".$aes;
-		//$s.= "\ndec  =".substr($dec,0,10)."...";
-		//$s.= "\ndec1=".$dec1;
 		$s = 'Messaggio decodificato: '.$dec;
 		return $s;
 		}
@@ -615,9 +588,7 @@ class Crycon						// Classe: connessione criptata
 			case CMD_COMMAND:
 				$this->comando = CMD_COMMAND;
 				$msg = $this->DecryptMessage($p1);
-				// Elabora il messaggio e prepara la risposta
-				$res = "Elaborato messaggio:\n".$msg;
-				//
+				$res = "Elaborato messaggio:\n".$msg."\nOra: ".date("Y-m-d H:i:s",time());	// Elabora il messaggio e prepara la risposta
 				$this->data = $this->EncryptMessage($res);
 				break;
 			case CMD_CONNECT:							// Connessione criptata
@@ -627,15 +598,30 @@ class Crycon						// Classe: connessione criptata
 					$aestmp = $this->GenerateAES();		// Ottiene un aes temporaneo in base64
 					$_SESSION[$this->ssk] = $aestmp;	// Memorizza l'aes di sessione (single symm key), in base64
 					$risposta = $aestmp.session_id();	// Aggiunge session ID
-														// Lo cifra con doppia chiave + timestamp... DA FARE
-					$this->data = $risposta;			// Lo invia come risposta
+					openssl_public_encrypt($risposta, $encrsa, $p1);	// Crittografa la risposta ($p1 contiene la puk)
+					$encrsa64 = base64_encode($encrsa);	// Codifica in base64
+					$this->data = $encrsa64;			// Lo invia come risposta
 					}
+				break;
+			case CMD_AESPK:								// Richiesta chiave pubblica per verifica aes
+				$this->comando = CMD_AESPK;				// Imposta la risposta da inviare
+				$privateKey = openssl_pkey_new(array('private_key_bits' => RSAKEYSIZE,'private_key_type' => OPENSSL_KEYTYPE_RSA,));
+				$privateKeyStr = '';
+				openssl_pkey_export ($privateKey, $privateKeyStr);	// La esporta come stringa
+				$_SESSION['prk'] = $privateKeyStr;					// La memorizza in sessione
+				$a_key = openssl_pkey_get_details($privateKey);		// Estrae i dettagli della chiave...
+				$publicKey = $a_key['key'];							// ...tra cui la chiave pubblica
+				$this->data = $publicKey;							// Invia la chiave pubblica in chiaro
 				break;
 			case CMD_AES:
 				$this->comando = CMD_AES;
-				if($_SESSION[$this->ssk] == $p1)
+				$dec = null;
+				$privateKey = openssl_pkey_get_private($_SESSION['prk']);	// Ottiene la chiave privata dalla stringa
+				$p2no64 = base64_decode($p1);								// Traduce la chiave aes criptata da base64
+				openssl_private_decrypt($p2no64, $dec, $privateKey);		// Decodifica la chiave aes con chiave privata 
+				if($_SESSION[$this->ssk] == $dec)							// Verifica
 					{
-					$this->data = $p1;
+					$this->data = sha1($dec);
 					}
 				else
 					{
@@ -674,8 +660,6 @@ class Crycon						// Classe: connessione criptata
 		$tmp = $this->GetMessage();						// Messaggio
 		if(!!$tmp)
 			$jsn[ID_MSG] = $tmp;
-		//else 
-		//	$jsn[ID_MSG] = "...";
 		$tmp = $this->GetError();						// Errore
 		if(!!$tmp)
 			$jsn[ID_ERR] = $tmp;
@@ -698,20 +682,9 @@ class Crycon						// Classe: connessione criptata
 		switch($this->comando)
 			{
 			case CMD_COMMAND:
-				{
-				$jsn[CMD_COMMAND] = $this->data;		// Invia i dati criptati preparati prima
-				}
-				break;
 			case CMD_CONNECT:
-				{
-				$jsn[$this->comando] = $this->data;
-				}
-				break;
 			case CMD_AES:
-				{
-				$jsn[$this->comando] = $this->data;
-				}
-				break;
+			case CMD_AESPK:
 			case ID_START:
 				{
 				$jsn[$this->comando] = $this->data;
@@ -721,12 +694,9 @@ class Crycon						// Classe: connessione criptata
 				$jsn[$this->comando] = ID_EXE;
 				break;
 			}
-			
-		//CONTROLLARE !!!! $THIS->DATA SEMBRA VUOTO... VEDERE PROCESSREQUEST()
 #		ERRORE: COMPLETARE CODIFICA DI:
 #		COMANDO GENERICO: $JSN[comando] = ID_EXE
 #		COMANDO SPECIFICO: $JSN[CMD_COMMAND] = "DATI"
-			
 		echo json_encode($jsn);
 		}
 	}

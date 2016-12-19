@@ -1,4 +1,5 @@
 var refresh_timer;						// Timer globale
+var crypt;								// Crittografatore a chiave RSA
 
 function init()							// Imposta la pagina
 	{									// Comandi associati ai pulsanti
@@ -35,6 +36,7 @@ function init()							// Imposta la pagina
 		);
 	refresh_timer = null;				// Azzera oggetto timer
 	ALPH = Caratteri(' ','~');
+	crypt = null;
 	return;
 	}
 function Caratteri(da,a)
@@ -91,7 +93,8 @@ function command(cmd)					// Esegue un comando
 			break;
 		case "<?php echo ID_START;?>":				// Avvio timer + richiesta di connessione
 			startTimer();
-			sendRequest(url,"<?php echo CMD_CONNECT;?>","","");				// Richiesta di connessione				
+			command("<?php echo CMD_CONNECT;?>");	// Richiesta di connessione
+			command
 			break;
 		case "<?php echo ID_STOP;?>":				// Stop timer
 			stopTimer();
@@ -103,12 +106,91 @@ function command(cmd)					// Esegue un comando
 			}
 			break;
 		case "<?php echo CMD_CONNECT;?>":			// Connect
-			sendRequest(url,cmd,"","");
+			GenerateRSAkeys();						// Genera coppia di chiavi RSA						
+			sendRequest(url,"<?php echo CMD_CONNECT;?>",sessionStorage.puk,"");		// Richiesta di connessione	
 			break;
 		case "<?php echo CMD_AES;?>":				// AES
-			sendRequest(url,cmd,sessionStorage.aes,"");
+			SetPUK();
+			enc = crypt.encrypt(sessionStorage.aes);	// Crittografa l'aes della sessione, e lo invia
+			sendRequest(url,cmd,enc,"");
+			break;
+		case "<?php echo CMD_AESPK;?>":				// Richiesta chiave pubblica per verifica
+			sendRequest(url,cmd,"","");
 			break;
 		}
+	}
+function processJsonData(data)			// Analizza risposta del server conseguente alla richiesta 
+	{
+	$msg = "";
+	datiObj = JSON.parse(data);
+	$.each(datiObj,function(i,o)
+			{
+			switch(i)
+				{
+				case '<?php echo CMD_COMMAND;?>':		// Risposta del server a Command
+					{
+					decstr = DecryptMessage(o,sessionStorage.aes);
+					alert("Risposta= "+decstr);
+					}
+					break;
+				case '<?php echo CMD_CONNECT;?>':			// Risposta del server a Connect:...
+					{										// ...chiave aes + sid crittografati con chiave pubblica
+					dec = crypt.decrypt(o);					// Decifra con l'oggetto crypt precedente (poi GenerateRSAkeys())
+					sessionStorage.aes = dec.substr(0,'<?php echo AESSIZE64;?>');	// Salva l'aes base64 nella sessione
+					if(dec.substr('<?php echo AESSIZE64;?>') != sessionStorage.sid)	// Verifica che l'sid corrisponda
+						{
+						alert("sid not matching");
+						}
+					else
+						{
+						command('<?php echo CMD_AESPK;?>');	// Esegue la richiesta di verifica dell'aes, come conferma
+						}
+					}
+					break;
+				case '<?php echo CMD_AES;?>':				// Riceve la risposta del server alla richista di conferma dell'aes
+					{
+					if(o != CryptoJS.SHA1(sessionStorage.aes))
+						alert("aes errato");
+					else
+						{
+						xx = CryptoJS.enc.Utf8.stringify(CryptoJS.enc.Base64.parse(sessionStorage.aes));
+						alert(i + "(from base64): " + xx);
+						}
+					}
+					break;
+				case '<?php echo CMD_AESPK;?>':				// Riceve la chiave pubblica dal server
+					{
+					sessionStorage.puk = o;					// Le memorizza
+					command('<?php echo CMD_AES;?>');		// Esegue la richiesta di verifica dell'aes,
+					}
+				break;
+				case "<?php echo ID_START;?>":			// Cattura il comando start (con argomento)
+					{
+					sessionStorage.sid = o;				// Imposta la session id
+					command(i);							// Esegue il comando start
+					}
+					break;
+				default:
+					{
+					if(o == '+')				// Mostra oggetti di classe .i
+						{
+						$("."+i).show();
+						}
+					else if(o == '-')			// Nasconde oggetti di classe .i
+						{
+						$("."+i).hide();
+						}
+					else if(o == '*')			// Esegue il comando i (senza parametri)
+						{
+						command(i);
+						}
+					else
+						$("#"+i).text(o);		// Imposta il testo dell'oggetto #i al valore o
+					}
+					break;
+				}
+			}
+		)
 	}
 $(document).ready(function()			// Dopo caricamento della pagina
 		{
@@ -196,115 +278,30 @@ function GenerateSeq(len)
 function GenerateRandom(len)
 	{
 	s = "";
-	//s = GenerateSeq(len);
-	s = GenerateRndSeq(len);
+	s = GenerateRndSeq(len);	//Per test: s = GenerateSeq(len);
 	return s;
+	}
+function GenerateRSAkeys()
+	{
+	crypt = new JSEncrypt({ default_key_size: '<?php echo RSAKEYSIZE; ?>' });
+	crypt.getKey();
+	sessionStorage.puk = crypt.getPublicKey();	// La chiave privata crypt.getPrivateKey() non viene salvata
+	}
+function SetPUK()
+	{
+	crypt = new JSEncrypt();
+	crypt.setKey(sessionStorage.puk);
 	}
 function EncryptMessage(msg,aes64)
 	{
-	//txt = "";
 	var ivstr = GenerateRandom('<?php echo IVSIZE;?>');
-	//var ivstr = GenerateRndSeq('<?php echo IVSIZE;?>');
-	//txt += "ivstr="+ ivstr + '\n';
-
 	var iv = CryptoJS.enc.Utf8.parse(ivstr);
-	//txt += "iv(utf8)="+ iv + '\n';
-	
 	var iv64 = CryptoJS.enc.Base64.stringify(iv);
-	//txt += "iv64="+iv64+'\n';
-
-	//var prova = CryptoJS.enc.Utf8.stringify(iv);
-	//var prova = iv.toString(CryptoJS.enc.Utf8);
-	//var prova64= CryptoJS.enc.Base64.stringify(prova);
-	//var prova64= CryptoJS.enc.Base64(prova);
-	//txt += "prova="+prova+'\n';
-	
-	//var key = CryptoJS.enc.Utf8.stringify(CryptoJS.enc.Base64.parse(sessionStorage.aes))
-	//var key = CryptoJS.enc.Utf8.parse(CryptoJS.enc.Base64.parse(sessionStorage.aes));
 	key= CryptoJS.enc.Utf8.parse(CryptoJS.enc.Utf8.stringify(CryptoJS.enc.Base64.parse(aes64)));
-	
-	//txt += "aes="+key+'\n';
-	
-	
 	var opt = { iv: iv, mode: CryptoJS.mode.CBC, padding: CryptoJS.pad.Pkcs7 };
-	
 	var enc = CryptoJS.AES.encrypt(msg, key, opt);
-	//txt += "enc="+enc+'\n';
-	
-	//alert(txt);
 	return iv64.concat(enc);
 	}
-
-function processJsonData(data)			// Analizza risposta del server conseguente alla richiesta 
-	{
-	$msg = "";
-	datiObj = JSON.parse(data);
-	$.each(datiObj,function(i,o)
-			{
-			switch(i)
-				{
-				case '<?php echo CMD_COMMAND;?>':		// Risposta del server a Command
-					{
-					decstr = DecryptMessage(o,sessionStorage.aes);
-					alert("Risposta= "+decstr);
-					}
-					break;
-				case '<?php echo CMD_CONNECT;?>':			// Risposta del server a Connect: la chiave aes
-					{										// (crittografata a doppia chiave: DA FARE)
-					//t64 = o.substr(0,'<?php echo AESSIZE64;?>');	// aes in base 64
-					//taes = CryptoJS.enc.Base64.parse(o);			// aes da base64 a byte (?)
-					//sessionStorage.aes = CryptoJS.enc.Utf8.stringify(taes);	// aes
-					sessionStorage.aes = o.substr(0,'<?php echo AESSIZE64;?>');		// Salva l'aes base64 nella sessione
-					if(o.substr('<?php echo AESSIZE64;?>') != sessionStorage.sid)	// Verifica che l'sid corrisponda
-						{
-						alert("sid not matching");
-						}
-					else
-						{
-						command('<?php echo CMD_AES;?>');	// Esegue il comando di risposta all'aes
-						}
-					}
-					break;
-				case '<?php echo CMD_AES;?>':
-					{
-					if(o != sessionStorage.aes)
-						alert("aes errato");
-					else
-						{
-						xx = CryptoJS.enc.Utf8.stringify(CryptoJS.enc.Base64.parse(o));
-						alert(i + "(from base64): " + xx);
-						}
-					}
-					break;
-				case "<?php echo ID_START;?>":			// Cattura il comando start (con argomento)
-					{
-					sessionStorage.sid = o;				// Imposta la session id
-					command(i);							// Esegue il comando start
-					}
-					break;
-				default:
-					{
-					if(o == '+')				// Mostra oggetti di classe .i
-						{
-						$("."+i).show();
-						}
-					else if(o == '-')			// Nasconde oggetti di classe .i
-						{
-						$("."+i).hide();
-						}
-					else if(o == '*')			// Esegue il comando i (senza parametri)
-						{
-						command(i);
-						}
-					else
-						$("#"+i).text(o);		// Imposta il testo dell'oggetto #i al valore o
-					}
-					break;
-				}
-			}
-		)
-	}
-
 function showHideUnLogged()
 	{
 	$l = "<?php echo $x->IsLogged(); ?>";
@@ -320,18 +317,4 @@ function showHideUnLogged()
 		$(".<?php echo ID_UNLOGGED;?>").show();
 		}
 	
-	}
-function encode(txt)
-	{
-	aes = hex2bin(sessionStorage.aes);
-	
-	}
-function hex2bin(hex)
-	{
-    var bytes = [], str;
-
-    for(var i=0; i< hex.length-1; i+=2)
-        bytes.push(parseInt(hex.substr(i, 2), 16));
-
-    return String.fromCharCode.apply(String, bytes);    
 	}
