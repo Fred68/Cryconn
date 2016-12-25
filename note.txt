@@ -58,7 +58,7 @@
 	.		Completare script.php con caricamento script da cdn o locale
 	
 	v		Inserire la chiave AES e salvarla in locale.
-			Usare inizialmente localStorage (insicuro !!!) o, meglio, sessionStorage (non molto sicuro)
+			Usare sessionStorage.
 			
 	.		Studiare due coppie di chiavi asimmetriche, per l'invio sicure della chiave aes
 			Messaggi da client js a server php:
@@ -74,7 +74,7 @@
 				php prepara il messaggio (la chiave aes + altri dati eventuali, timestamp, session ecc...)
 				php crittografa il messaggio con la chiave pubblica e lo invia
 				js decifra il messaggio con la chiave privata
-	v		Crittografate con chiave pubblica la chiave AES inviata da server a Client.
+	v		Crittografare con chiave pubblica la chiave AES inviata da server a Client.
 				js genera coppia di chiavi puk e prk.
 				js Invia la puk a php
 				php genera la chiave aes e la unisce al sid
@@ -114,184 +114,98 @@
 				Server e Client devono scambiarsi, prima e con un canale differente, due coppie di chiavi pubblica e privata.
 				Poi possono usare queste chiavi per scambiarsi la chiave aes oppure per autenticare i messaggi.
 
-		->		Librerie:
-				php: vd. esempi in calce	
-				
-	.		Successivamente, non usare localStorage o sessionStorage.
-			Provare download link e Blob per salvare i dati in un file locale 
-			Registrare in localStorage nome completo del file. Poi:
-			Ripristinare il nome completo del file.
-			Se nullo: chiederlo con un prompt.
-			Leggere il contenuto del file.
-			Se manca: richiedere dall'inizio.
+	v		Richiedere testo in js e salvarlo in locale. Sì, con Blob e download link.
+	v		Leggere il contenuto di un file in js. Sì, con <input type='file'> e FileReader.
+
+			SISTEMA ATTUALE
+			
+			Login:
+			1.	js		Click login : invia CMD_LOGIN + user + l'hash della password 
+			2.	php		Verifica user e pwd, imposta session variables e aggiunge agli utenti connessi.
+						Risponde con ID_START e sid
+			3.	js		Memorizza sid in sessione.
+						Esegue ID_START: avvia timer.
+						Esegue CMD_CONNECT: genera chiavi RSA, memorizza puk in sessione.
+						Invia CMD_CONNECT + puk
+			4.	php		Genera chiave AES, la unisce alla sid, crittografa con la puk e codifica in base64.
+						Risponde con CMD_CONNECT + aes e sid criptati
+			5.	js		Decifra e memorizza la chiave AES e verifica la sid.
+						Risponde con richiesta CMD_AESPK
+			6.	php		Genera chiavi RSA
+						Invia CMD_AESPK + puk
+			7.	js		Memorizza la puk.
+						Esegue CMD_AES: crittografa chiave AES con chiave puk.
+						Invia come comando CMD_AES.
+			8.	php		Decifra la chiave AES con la prk.
+						La verifica con quella memorizzata.
+						Risponde con CMD_AES e l'hash dell'AES
+			9.	js		Verifica l'hash della chiave AES memorizzata con quello ricevuto.
+			
+			Comandi:
+			C1.	js		Invia CMD_COMMAND + comando crittografato con AES
+			C2.	php		Decifra il comando, lo esegue. Compone la risposta come comando=testo. La crittografa con chiave AES, ed invia con comando CMD_COMMAND.
+			C3.	js		Riceve CMD_COMMAND. Decifra comando=testo. Elabora il comando.
+			
+			Elaborazione comandi (client js) decifrati:
+			default			Mostra il messaggio
+			CMD_PRK			Estrae il testo con la chiave privata. Mostra il link di download, crea un blob con il testo e lo associa al target del link.
+			
+			Elaborazione comandi (server php) decifrati
+			CMD_PRK			Genera chiavi RSA. Invia la chiave privata. [poi deve memorizzare la pubblica e verificare la ricezione corretta dal Client]
+			
+			Pulsanti
+			Prk				Invia CMD_COMMAND con comando CMD_PRK.
+			
+			PUNTI VULNERABILI DEL LOGIN:
+			1.	js		L'hash può essere riprodotto, bloccando o alterando il login, il clear o il logout. Non vi è autenticazione.
+						- Crittografare l'hash della password con la chiave privata del Client, così l'identificazione è univoca.
+							No, perchè un MITM potrebbe semplicemente memorizzare e reinviare i dati in un secondo tempo.
+						- Crittografare l'hash della password ed un timestamp: così i dati inviati sono sempre diversi.
+							No, può comunque esser riutilizzato.
+							Il timestamp ha una struttura costante.
+						- Crittografare l'hash della password ed un timestamp. Il server memorizza l'ultimo login e verifica che il timestamp sia successivo.
+							No, complesso e comunque aggirabile con finti timestamp.
+					----->	Creare coppia di chiavi (puk su server php, prK inviata al Client in modo sicuro o crittografato, poi eliminata).
+							Il client legge prima il file locale contenente la chiave privata.
+							Genera l'hash della password e timestamp e li crittografa insieme con la chiave privata.
+							Il server lo decifra con la chiave pubblica per quell'utente.
+						->	Ricordarsi di cambiare frequentememnte le chiavi RSA.
+			2.	php		Invia sid in chiaro.
+						-	Inviarlo crittografato con chiave pubblica ?
+					xxxx->	No, inutile... il sid è un dato inviato in chiaro con l'header della sessione ?
+			3.			Un MITM può sostituire il puk con il suo, poi intercettare la risposta del server e sostituirla con la sua.
+					!!!!	PUNTO DEBOLE DI TUTTO IL SISTEMA !
+			6.			Il server risponde con un comando invariante, cha facilita la forzatura della chiave.
+			
+			MODIFICARE LA SEQUENZA COME SEGUE:
+			
+			Prima della connessione:
+			-	php			Crea una coppia di chiavi per ogni utente.
+							Consegna in modo sicuro la chiave privata (con operatore) per autenticazione.
+							Memorizza la chiave pubblica nel database.
+			-	php			In alternativa, con connessione criptata, invia la chiave privata al client.
+			-	js			All'avvio, legge il file con la chiave privata e la memorizza in una variabile del programma, Meglio non in session variable.
+
+			Connessione:
+			-	js			
+			
+			
+
+
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
 	
-##############################################################################
-
-
-<?php
-$pkGenerate = openssl_pkey_new(array('private_key_bits' => 2048,'private_key_type' => OPENSSL_KEYTYPE_RSA));	// generate 2048-bit RSA key
-openssl_pkey_export($pkGenerate,$pkGeneratePrivate); // NOTE: second argument is passed by reference	// get the private key
-$pkGenerateDetails = openssl_pkey_get_details($pkGenerate);		// get the...
-$pkGeneratePublic = $pkGenerateDetails['key'];					// ...public key
-openssl_pkey_free($pkGenerate);									// free resources
-// fetch/import public key from PEM formatted string $pkGeneratePrivate now is PEM formatted... this is an alternative method from the public retrieval in previous
-$pkImport = openssl_pkey_get_private($pkGeneratePrivate); 		// import
-$pkImportDetails = openssl_pkey_get_details($pkImport); 		// same as getting the public key in previous
-$pkImportPublic = $pkImportDetails['key'];
-openssl_pkey_free($pkImport); 									// clean up
- echo "\n".$pkGeneratePrivate."\n".$pkGeneratePublic."\n".$pkImportPublic."\n".'Public keys are '.(strcmp($pkGeneratePublic,$pkImportPublic)?'different':'identical').'.';
-?>
-
-<?php
-$privateKey = openssl_pkey_new(array('private_key_bits' => 2048,'private_key_type' => OPENSSL_KEYTYPE_RSA,));	// generate a 2048 bit rsa private key, returns a php resource, save to file
-openssl_pkey_export_to_file($privateKey, '/path/to/privatekey', $passphrase);
-$keyDetails = openssl_pkey_get_details($privateKey);			// get the public key $keyDetails['key'] from the private key;
-file_put_contents('/path/to/publickey', $keyDetails['key']);
-$pubKey = openssl_pkey_get_public('file:///path/to/publickey');
-openssl_public_encrypt($sensitiveData, $encryptedData, $pubKey);
-$privateKey = openssl_pkey_get_private('file:///path/to/privatekey', $passphrase);	// retrieve $encryptedData from storage ...
-openssl_private_decrypt($encryptedData, $sensitiveData, $privateKey);				// load the private key and decrypt the encrypted data
-?>
-
-
-<?php
-// Generate
-$privateKey = openssl_pkey_new(array('private_key_bits' => 2048,'private_key_type' => OPENSSL_KEYTYPE_RSA,));
-openssl_pkey_export_to_file($privateKey, 'private.key');
-$a_key = openssl_pkey_get_details($privateKey);
-file_put_contents('public.key', $a_key['key']);
-openssl_free_key($privateKey);
-// Encrypt
-$plaintext = 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Aenean eleifend vestibulum nunc sit amet mattis. Nulla at volutpat nulla. Pellentesque sodales vel ligula quis consequat. Suspendisse dapibus dolor nec viverra venenatis. Pellentesque blandit vehicula eleifend. Duis eget fermentum velit. Vivamus varius ut dui vel malesuada. Ut adipiscing est non magna posuere ullamcorper. Proin pretium nibh nec elementum tincidunt. Vestibulum leo urna, porttitor et aliquet id, ornare at nibh. Maecenas placerat justo nunc, varius condimentum diam fringilla sed. Donec auctor tellus vitae justo venenatis, sit amet vulputate felis accumsan. Aenean aliquet bibendum magna, ac adipiscing orci venenatis vitae.';
-echo 'Plain text: ' . $plaintext;
-$plaintext = gzcompress($plaintext);
-$publicKey = openssl_pkey_get_public('file:///path/to/public.key');
-$a_key = openssl_pkey_get_details($publicKey);
-$chunkSize = ceil($a_key['bits'] / 8) - 11;
-$output = '';
-while ($plaintext)
-	{
-    $chunk = substr($plaintext, 0, $chunkSize);
-    $plaintext = substr($plaintext, $chunkSize);
-    $encrypted = '';
-    if (!openssl_public_encrypt($chunk, $encrypted, $publicKey))
-		{
-        die('Failed to encrypt data');
-		}
-    $output .= $encrypted;
-	}
-openssl_free_key($publicKey);
-$encrypted = $output;
-// Decrypt
-if (!$privateKey = openssl_pkey_get_private('file:///path/to/private.key'))
-	{
-    die('Private Key failed');
-	}
-$a_key = openssl_pkey_get_details($privateKey);
-$chunkSize = ceil($a_key['bits'] / 8);
-$output = '';
-while ($encrypted)
-	{
-    $chunk = substr($encrypted, 0, $chunkSize);
-    $encrypted = substr($encrypted, $chunkSize);
-    $decrypted = '';
-    if (!openssl_private_decrypt($chunk, $decrypted, $privateKey))
-		{
-        die('Failed to decrypt data');
-		}
-    $output .= $decrypted;
-	}
-openssl_free_key($privateKey);
-$output = gzuncompress($output);
-echo '<br /><br /> Unencrypted Data: ' . $output;
-?>
-
-
-JS
-http://asecuritysite.com/encryption/js05
-USARE QUESTA: http://travistidwell.com/jsencrypt/  anche su cdnjs cloudflare
-
- <script type="text/javascript">
-    $(function () {
-
-        //Change the key size value for new keys
-        $(".change-key-size").each(function (index, value) {
-            var el = $(value);
-            var keySize = el.attr('data-value');
-            el.click(function (e) {
-                var button = $('#key-size');
-                button.attr('data-value', keySize);
-                button.html(keySize + ' bit <span class="caret"></span>');
-                e.preventDefault();
-            });
-        });
-
-        // Execute when they click the button.
-        $('#execute').click(function () {
-
-            // Create the encryption object.
-            var crypt = new JSEncrypt();
-
-            // Set the private.
-            crypt.setPrivateKey($('#privkey').val());
-            //return;
-            // If no public key is set then set it here...
-            var pubkey = $('#pubkey').val();
-            if (!pubkey) {
-                $('#pubkey').val(crypt.getPublicKey());
-            }
-
-            // Get the input and crypted values.
-            var input = $('#input').val();
-            var crypted = $('#crypted').val();
-
-            // Alternate the values.
-            if (input) {
-                $('#crypted').val(crypt.encrypt(input));
-                $('#input').val('');
-            }
-            else if (crypted) {
-                var decrypted = crypt.decrypt(crypted);
-                if (!decrypted)
-                    decrypted = 'This is a test!';
-                $('#input').val(decrypted);
-                $('#crypted').val('');
-            }
-        });
-
-        var generateKeys = function () {
-            var sKeySize = $('#key-size').attr('data-value');
-            var keySize = parseInt(sKeySize);
-            var crypt = new JSEncrypt({ default_key_size: keySize });
-            var async = $('#async-ck').is(':checked');
-            var dt = new Date();
-            var time = -(dt.getTime());
-            if (async) {
-                $('#time-report').text('.');
-                var load = setInterval(function () {
-                    var text = $('#time-report').text();
-                    $('#time-report').text(text + '.');
-                }, 500);
-                crypt.getKey(function () {
-                    clearInterval(load);
-                    dt = new Date();
-                    time += (dt.getTime());
-                    $('#time-report').text('Generated in ' + time + ' ms');
-                    $('#privkey').val(crypt.getPrivateKey());
-                    $('#pubkey').val(crypt.getPublicKey());
-                });
-                return;
-            }
-            crypt.getKey();
-            dt = new Date();
-            time += (dt.getTime());
-            $('#time-report').text('Generated in ' + time + ' ms');
-            $('#privkey').val(crypt.getPrivateKey());
-            $('#pubkey').val(crypt.getPublicKey());
-        };
-
-        // If they wish to generate new keys.
-        $('#generate').click(generateKeys);
-        generateKeys();
-    });
-</script>

@@ -559,8 +559,7 @@ class Crycon						// Classe: connessione criptata
 		$method = "aes-256-cbc";
 		$aes = base64_decode($_SESSION[$this->ssk]);
 		$dec  = openssl_decrypt($enc, $method, $aes, false, $iv);
-		$s = 'Messaggio decodificato: '.$dec;
-		return $s;
+		return $dec;
 		}
 	public function ProcessRequest($p0,$p1,$p2)			// Analizza la richiesta e la esegue
 		{
@@ -585,10 +584,10 @@ class Crycon						// Classe: connessione criptata
 			case CMD_REFRESH:
 				$done = $this->CmdRefresh($p0,$p1,$p2);
 				break;
-			case CMD_COMMAND:
+			case CMD_COMMAND:							// Elabora una stringa di comando generico (criptata)
 				$this->comando = CMD_COMMAND;
 				$msg = $this->DecryptMessage($p1);
-				$res = "Elaborato messaggio:\n".$msg."\nOra: ".date("Y-m-d H:i:s",time());	// Elabora il messaggio e prepara la risposta
+				$res = $this->ProcessMessage($msg);
 				$this->data = $this->EncryptMessage($res);
 				break;
 			case CMD_CONNECT:							// Connessione criptata
@@ -699,5 +698,24 @@ class Crycon						// Classe: connessione criptata
 #		COMANDO SPECIFICO: $JSN[CMD_COMMAND] = "DATI"
 		echo json_encode($jsn);
 		}
+	
+	function ProcessMessage($m)							// Elabora il messaggio e prpara risposta (inizia con comando ed =) 
+		{
+		$r = '';
+		switch($m)
+			{
+			case CMD_PRK:
+				$privateKey = openssl_pkey_new(array('private_key_bits' => RSAKEYSIZE,'private_key_type' => OPENSSL_KEYTYPE_RSA,));
+				$privateKeyStr = '';
+				openssl_pkey_export ($privateKey, $privateKeyStr);	// La esporta come stringa
+				$r = CMD_PRK.'='.$privateKeyStr;
+				break;
+			default:
+				$r = '000'.'='."Elaborato messaggio:\n".$m."\nOra: ".date("Y-m-d H:i:s",time());
+				break;
+			}
+		return $r;
+		}
+
 	}
 ?>	

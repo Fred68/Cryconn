@@ -1,7 +1,18 @@
 Hello,
 
-a login system with data encryption has been developed, still not completely debugged yet.
+a login system with data encryption has been developed,but still not finished.
+
+In fact there are some safety risks pending, mainly regarding public and private keys exchange, to be written.
+Moreover, the login sequence is complicated and not debugged, but I'm planninmg to simplify it, introducing key exchange.
+
 It is based on php, jQuery and a sqlite database.
+
+
+
+(i.e. post data sanitizing is to be done);  
+
+The login sequence is 
+
 
 The source is on github at this link [DATA TO BE LOADED ON GITHUB YET].
 A test page is here http://fred68.altervista.org/test/ , go to main link.

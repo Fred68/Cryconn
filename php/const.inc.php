@@ -17,9 +17,6 @@ define('RSAKEYSIZE',1024);	// 512,1024,2048
 
 define('TESTO_PROVA',"Testo di prova per verificare il funzionamento della crittografia");
 
-// Valori possibili per lo stato della connessione
-
-
 // Valori delle stringhe dei messaggi e degli id dell'html
 define('ID_MSG',"messaggio");
 define('ID_ERR',"errore");
@@ -34,7 +31,9 @@ define('ID_START',"start");
 define('ID_STOP',"stop");
 define('ID_COMMAND',"command");
 define('ID_CONNECT',"connect");
+define('ID_FILE',"files");
 
+// Valori dei comandi in chiaro
 define('CMD_LOGIN',"login");
 define('CMD_CLEAR',"clear");
 define('CMD_LOGOUT',"logout");
@@ -45,3 +44,9 @@ define('CMD_RQCONNECT',"rqcnt");
 define('CMD_CONNECT',"cnt");
 define('CMD_AES',"aes");
 define('CMD_AESPK',"aespk");
+
+define('DWN_PRK',"DprK");		// id, da verificare
+define('FIL_PRK',"prK.txt");	// id, da verificare
+
+// Valori dei comandi criptati
+define('CMD_PRK',"prK");

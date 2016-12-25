@@ -43,12 +43,16 @@ if(!$ret)
 			<button class="<?php echo ID_UNLOGGED;?>" id="<?php echo CMD_CLEAR;?>">Clear</button>			
 			<button class="<?php echo ID_UNLOGGED;?>" id="<?php echo CMD_RELOAD;?>">Reload</button>
 			<button class="<?php echo ID_LOGGED;?>" id="<?php echo CMD_LOGOUT;?>">Logout</button>
-			
+			<input type="file" id="<?php echo ID_FILE;?>" name="<?php echo ID_FILE;?>[]" />
+			<!-- <output id="list"></output>  -->
+			<!-- <a download="<?php echo CMD_PRK;?>" id="<?php echo DWN_PRK;?>">download</a>  -->
 		</div>
 		<div class="<?php echo ID_LOGGED;?>">
 		<p>Funzioni per l'utente:</p>
 		<button id="<?php echo ID_TEST;?>">Test</button>
 		<button id="<?php echo ID_COMMAND;?>">Command</button>
+		<button id="<?php echo CMD_PRK;?>">prk</button>
+		<a download="<?php echo CMD_PRK;?>" id="<?php echo DWN_PRK;?>">download</a>
 		</div>
 	</body>
 	</html>

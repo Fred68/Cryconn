@@ -1,6 +1,15 @@
 var refresh_timer;						// Timer globale
 var crypt;								// Crittografatore a chiave RSA
 
+$(document).ready(function()			// Dopo caricamento della pagina
+		{
+		init();
+		showHideUnLogged();				// Mostra/nasconde se (un)logged + timer restart dopo refresh
+		prepareFileReader();
+		getPrivateKey();
+		}
+	);
+
 function init()							// Imposta la pagina
 	{									// Comandi associati ai pulsanti
 	$("#<?php echo CMD_LOGIN;?>").click(function(event)
@@ -34,10 +43,47 @@ function init()							// Imposta la pagina
 			command("<?php echo CMD_COMMAND;?>");
 			}
 		);
+	$("#<?php echo CMD_PRK;?>").click(function(event)
+			{
+			p1 = "<?php echo CMD_PRK;?>";
+			command("<?php echo CMD_COMMAND;?>");
+			}
+		);
+	$("#<?php echo DWN_PRK;?>").click(function(event)
+			{
+			$("#<?php echo DWN_PRK;?>").hide();
+			}
+		);
+	$("#<?php echo DWN_PRK;?>").hide();
+	$("#<?php echo ID_FILE;?>").change(filechange);
 	refresh_timer = null;				// Azzera oggetto timer
 	ALPH = Caratteri(' ','~');
 	crypt = null;
 	return;
+	}
+function filechange()
+	{
+	//alert($("#<?php echo ID_FILE;?>").val());		// fake path
+	file = $("#<?php echo ID_FILE;?>")[0].files[0];
+	reader = new FileReader();
+	reader.onload = getText;
+	reader.readAsText(file);
+	}
+function getText()
+	{
+	txt = reader.result;
+	alert("Letto...\n" + txt);
+	}
+function prepareFileReader()
+	{
+	if (window.File && window.FileReader && window.FileList && window.Blob)
+		{
+		alert('File API attive');
+		}
+	else
+		{
+		alert('File APIs non funzionanti nel browser attuale.');
+		}
 	}
 function Caratteri(da,a)
 	{
@@ -76,8 +122,8 @@ function command(cmd)					// Esegue un comando
 		case "<?php echo CMD_LOGIN;?>":
 			p1 = $("#usr").val();
 			p2 = CryptoJS.SHA1($("#pwd").val());
-			sendRequest(url,cmd,p1,p2);
-			sendRequest(url,'refresh',"","");
+			sendRequest(url,cmd,p1,p2);				// Richiesta di login
+			sendRequest(url,"<?php echo CMD_REFRESH;?>","","");		// Subito un refresh 'refresh'
 			break;
 		case "<?php echo CMD_CLEAR;?>":
 		case "<?php echo CMD_LOGOUT;?>":
@@ -130,7 +176,7 @@ function processJsonData(data)			// Analizza risposta del server conseguente all
 				case '<?php echo CMD_COMMAND;?>':		// Risposta del server a Command
 					{
 					decstr = DecryptMessage(o,sessionStorage.aes);
-					alert("Risposta= "+decstr);
+					ProcessMessage(decstr);
 					}
 					break;
 				case '<?php echo CMD_CONNECT;?>':			// Risposta del server a Connect:...
@@ -151,11 +197,7 @@ function processJsonData(data)			// Analizza risposta del server conseguente all
 					{
 					if(o != CryptoJS.SHA1(sessionStorage.aes))
 						alert("aes errato");
-					else
-						{
-						xx = CryptoJS.enc.Utf8.stringify(CryptoJS.enc.Base64.parse(sessionStorage.aes));
-						alert(i + "(from base64): " + xx);
-						}
+					//else {alert(i + "(from base64): " + CryptoJS.enc.Utf8.stringify(CryptoJS.enc.Base64.parse(sessionStorage.aes)));}
 					}
 					break;
 				case '<?php echo CMD_AESPK;?>':				// Riceve la chiave pubblica dal server
@@ -192,12 +234,18 @@ function processJsonData(data)			// Analizza risposta del server conseguente all
 			}
 		)
 	}
-$(document).ready(function()			// Dopo caricamento della pagina
+function getPrivateKey()
+	{
+	var prK = prompt("Insert private key", "");
+	if(prK)
 		{
-		init();
-		showHideUnLogged();				// Mostra/nasconde se (un)logged + timer restart dopo refresh
+		prK = prK.replace(/(\r\n|\n|\r)/gm,'');
+		var link = document.getElementById('<?php echo DWN_PRK;?>');
+		link.href = window.URL.createObjectURL(new Blob([prK], {type: 'text/plain'})); 
+		link.style.display = 'block';
+		alert("Click link and save file...");
 		}
-	); 
+	}
 function refreshRequest()				// Esegue refresh del timer
 	{
 	sendRequest("<?php echo $_SERVER['REQUEST_URI']; ?>",'refresh',"","");
@@ -232,13 +280,9 @@ function DecryptMessage(msg,aes64)
 	{
 	iv64 = msg.substr(0,'<?php echo IVSIZE64;?>');
 	enc = msg.substr('<?php echo IVSIZE64;?>');
-	iv = CryptoJS.enc.Utf8.parse(CryptoJS.enc.Utf8.stringify(CryptoJS.enc.Base64.parse(iv64)));
-	
+	iv = CryptoJS.enc.Utf8.parse(CryptoJS.enc.Utf8.stringify(CryptoJS.enc.Base64.parse(iv64)));	
 	key= CryptoJS.enc.Utf8.parse(CryptoJS.enc.Utf8.stringify(CryptoJS.enc.Base64.parse(aes64)));
 	opt = { iv: iv, mode: CryptoJS.mode.CBC, padding: CryptoJS.pad.Pkcs7 };
-	//enccfr = CryptoJS.AES.encrypt("<?php echo TESTO_PROVA;?>", key, opt);
-	//deccfr = CryptoJS.AES.decrypt(enccfr, key, opt);
-	//decstrcfr = deccfr.toString(CryptoJS.enc.Utf8);
 	dec = CryptoJS.AES.decrypt(enc, key, opt);
 	decstr = dec.toString(CryptoJS.enc.Utf8);
 	return decstr;
@@ -315,6 +359,28 @@ function showHideUnLogged()
 		{
 		$(".<?php echo ID_LOGGED;?>").hide();
 		$(".<?php echo ID_UNLOGGED;?>").show();
+		}
+	
+	}
+function ProcessMessage(m)
+	{
+	n = m.indexOf("=");
+	if(n === -1)
+		{
+		alert("Messaggio anomalo");
+		return;
+		}
+	cmd = m.substr(0,n);
+	m = m.substr(n+1);
+	switch(cmd)
+		{
+		case "<?php echo CMD_PRK;?>":
+			$("#<?php echo DWN_PRK;?>").show();
+			$("#<?php echo DWN_PRK;?>").attr("href",window.URL.createObjectURL(new Blob([m], {type: 'text/plain'})));
+			break;
+		default:
+			alert("Comando "+cmd+"\n"+m);
+			break;
 		}
 	
 	}
