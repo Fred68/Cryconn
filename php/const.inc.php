@@ -31,9 +31,10 @@ define('ID_START',"start");
 define('ID_STOP',"stop");
 define('ID_COMMAND',"command");
 define('ID_CONNECT',"connect");
-define('ID_FILE',"files");
+define('ID_VKEYS',"vks");
 
-// Valori dei comandi in chiaro
+
+// Valori dei comandi in chiaro e id
 define('CMD_LOGIN',"login");
 define('CMD_CLEAR',"clear");
 define('CMD_LOGOUT',"logout");
@@ -45,8 +46,15 @@ define('CMD_CONNECT',"cnt");
 define('CMD_AES',"aes");
 define('CMD_AESPK',"aespk");
 
-define('DWN_PRK',"DprK");		// id, da verificare
-define('FIL_PRK',"prK.txt");	// id, da verificare
+// Chiavi rsa, nomi file e id 
+//define('DWN_PK',"DwprK");
+define('DWN_PUK',"DwpuK");
+// define('FIL_PRK',"prK.txt");
+define('FIL_PUK',"puK.txt");
+define('ID_FILEPUK',"pukf");
+//define('ID_FILEPRK',"prkf");
 
 // Valori dei comandi criptati
-define('CMD_PRK',"prK");
+define('CMD_PK',"pK");			// Richiesta nuove chiavi
+define('CMD_KOK',"Kok");		// Conferma salvataggio chiavi
+define('CMD_RSTK',"rstK");		// Richiesta azzeramento chiavi

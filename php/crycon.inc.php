@@ -17,6 +17,8 @@ class Crycon						// Classe: connessione criptata
 	var $passwd = "passwd";			// hash della password del login		
 	var $keystr = "keystr";			// per aes
 	var $pwddb = "pwddb";			// per accesso database
+	var $privKey = "prK";			// Chiave privata
+	var $pubKey = "puK";			// Chiave pubblica
 	//////////////////////////////////
 	var $logged = "logged";			// Nome tabella logged e nomi dei campi:...
 	var $sid = "sid";		 		// session_id
@@ -67,24 +69,22 @@ class Crycon						// Classe: connessione criptata
 		$msgecho .= "<b>Parent constructor</b><br>";
 
 		$this->cmd["udroptb"] = "DROP TABLE IF EXISTS ".$this->users.";";
-		$this->cmd["utable"] = "CREATE TABLE ".$this->users." (".UID." INTEGER PRIMARY KEY NOT NULL, ".$this->usrname." TEXT NOT NULL, ".$this->passwd." TEXT NOT NULL, ".$this->keystr." TEXT DEFAULT NULL, ".$this->pwddb." TEXT);";	
+		$this->cmd["utable"] = "CREATE TABLE ".$this->users." (".UID." INTEGER PRIMARY KEY NOT NULL, ".$this->usrname." TEXT NOT NULL, ".$this->passwd." TEXT NOT NULL, ".$this->keystr." TEXT DEFAULT NULL, ".$this->pwddb." TEXT, ".$this->privKey." TEXT DEFAULT NULL, ".$this->pubKey." TEXT DEFAULT NULL );";	
 		$this->cmd["insert"] = "INSERT INTO ".$this->users." (".$this->usrname.", ".$this->passwd.", ".$this->keystr.", ".$this->pwddb.") VALUES (:".$this->usrname.", :".$this->passwd.", :".$this->keystr.", :".$this->pwddb.");";
 		$this->cmd["count"] = "SELECT COUNT(*) FROM ".$this->users.";";
 		$this->cmd["users"] = "SELECT DISTINCT * FROM ".$this->users.";";
-		$this->cmd["countusr"] = "SELECT COUNT(*) FROM ".$this->users." WHERE ".$this->usrname."= :".$this->usrname." AND ".$this->passwd."= :".$this->passwd.";";
-		$this->cmd["getusr"] = "SELECT ".UID.", ".$this->keystr.", ".$this->pwddb." FROM ".$this->users." WHERE ".$this->usrname."= :".$this->usrname." AND ".$this->passwd."= :".$this->passwd.";";
+		$this->cmd["countusr"] = "SELECT COUNT(*) FROM ".$this->users." WHERE ".$this->usrname."=:".$this->usrname." AND ".$this->passwd."=:".$this->passwd.";";
+		$this->cmd["getusr"] = "SELECT ".UID.", ".$this->keystr.", ".$this->pwddb." FROM ".$this->users." WHERE ".$this->usrname."=:".$this->usrname." AND ".$this->passwd."= :".$this->passwd.";";
+		$this->cmd["setkeys"] = "UPDATE ".$this->users." SET ".$this->privKey."=:".$this->privKey.", ".$this->pubKey."=:".$this->pubKey." WHERE ".UID."=:".UID.";";
+		$this->cmd["getusrpk"] = "SELECT ".$this->privKey.", ".$this->pubKey." FROM ".$this->users." WHERE ".$this->usrname."=:".$this->usrname.";";
 		
 		$this->cmd["ldroptb"] = "DROP TABLE IF EXISTS ".$this->logged.";";
-		//$this->cmd["ltable"] = "CREATE TABLE ".$this->logged." (".UID." INTEGER PRIMARY KEY NOT NULL, ".$this->sid." TEXT NOT NULL, ".$this->lgt." DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, ".$this->llg." DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP);";
 		$this->cmd["ltable"] = "CREATE TABLE ".$this->logged." (".UID." INTEGER PRIMARY KEY NOT NULL, ".$this->sid." TEXT NOT NULL, ".$this->ssk." TEXT, ".$this->lgt." INTEGER NOT NULL, ".$this->llg." INTEGER NOT NULL);";
 		$this->cmd["lcount"] = "SELECT COUNT(*) FROM ".$this->logged.";";
 		$this->cmd["logged"] = "SELECT DISTINCT * FROM ".$this->logged.";";
 		$this->cmd["countlgd"] = "SELECT COUNT(*) FROM ".$this->logged." WHERE ".UID."= :".UID.";";
-		//$this->cmd["insertlgu"] = "INSERT INTO ".$this->logged." (".UID.", ".$this->sid.") VALUES (:".UID.", :".$this->sid.");";
 		$this->cmd["insertlgu"] = "INSERT INTO ".$this->logged." (".UID.", ".$this->sid.", ".$this->lgt.", ".$this->llg.") VALUES (:".UID.", :".$this->sid.", :".$this->lgt.", :".$this->llg.");";
 		$this->cmd["removelgu"] = "DELETE FROM ".$this->logged." WHERE ".UID." = :".UID.";";
-		//$this->cmd["updlgu"] = "UPDATE ".$this->logged." SET ".$this->llg." = '".date(DATE_RFC3339)."' WHERE ".UID."= :".UID.";";
-		//$this->cmd["updlgu"] = "UPDATE ".$this->logged." SET ".$this->llg." = '"." CURRENT TIMESTAMP "."' WHERE ".UID."= :".UID.";";
 		$this->cmd["updlgu"] = "UPDATE ".$this->logged." SET ".$this->llg."=:".$this->llg." WHERE ".UID."=:".UID.";";
 		$this->cmd["getlgu"] = "SELECT ".$this->sid.", ".$this->lgt.", ".$this->llg." FROM ".$this->logged." WHERE ".UID."=:".UID.";";
 		if(strlen($dbname)<1)
@@ -95,15 +95,13 @@ class Crycon						// Classe: connessione criptata
 		$msgecho .=  "<b>Db</b><p>";
 		$msgecho .=  "Parent db name: ".$this->dbnm."<br>";
 		$msgecho .=  "</p>";
-		$msgecho .=  "<b>Comandi</b><p>";
+		$msgecho .=  "<b>Commands</b><p>";
 		foreach($this->cmd as $k => $x)
 			{
 			$msgecho .=  "cmd[\"".$k."\"]=".$x."<br>";	
 			}
 		$msgecho .=  "</p>";
-
 		$msgecho .=  "<b>End of Parent constructor</b><br>";
-		
 		if($this->debugMode === true)
 			echo $msgecho; 
 		}
@@ -119,7 +117,7 @@ class Crycon						// Classe: connessione criptata
 				}
 			catch(PDOException $e)
 				{	
-				$this->errore .= "<p><b>"."Errore: ".$e->getMessage()."</b></p>";
+				$this->errore .= "<p><b>"."Error: ".$e->getMessage()."</b></p>";
 				}	
 			}
 		return $ok;
@@ -149,11 +147,38 @@ class Crycon						// Classe: connessione criptata
 			}
 		catch(PDOException $e)
 			{
-			$this->errore .= "Errore: ".$e->getMessage()."\n";
+			$this->errore .= "Error: ".$e->getMessage()."\n";
 			$cnt = -1;
 			}
 		return $cnt;
 		}
+	protected function GetUserPKs($uname, &$puk, &$prk)			// Ottiene chiavi RSA dal database
+		{
+		$ok = false;
+		$puk = "";
+		$prk = "";
+		try
+			{
+			$this->Connect();									// Connette, se necessario, ma non disconnette
+			$stmt = $this->db->prepare($this->cmd["getusrpk"]);
+			$stmt->bindParam(":".$this->usrname,$uname);
+			$stmt->execute();
+			$cnt = $stmt->fetchAll(PDO::FETCH_NUM);
+			$nrows = count($cnt);
+			if($nrows > 0)
+				{
+				$row = $cnt[0]; 	// Sceglie la prima (ed unica)
+				$prk = $row[0]; 	// Legge le chiavi
+				$puk = $row[1];
+				$ok = true;
+				}
+			}
+		catch(PDOException $e)
+			{
+			$this->errore .= "Error: ".$e->getMessage()."\n";
+			}
+		return $ok;
+		}	
 	protected function GetUserKeys($uname, $upwd, &$id, &$key, &$pwdb)	// Ottiene chiave e password del database
 		{
 		$ok = false;
@@ -169,7 +194,6 @@ class Crycon						// Classe: connessione criptata
 				$stmt = $this->db->prepare($this->cmd["getusr"]);
 				$stmt->bindParam(":".$this->usrname,$uname);
 				$stmt->bindParam(":".$this->passwd,$upwd);
-				//$stmt->bindParam(":".UID,$id);
 				$stmt->execute();
 				$cnt = $stmt->fetchAll(PDO::FETCH_NUM);
 				$row = $cnt[0]; 	// Sceglie la prima (ed unica)
@@ -180,15 +204,34 @@ class Crycon						// Classe: connessione criptata
 				}
 			catch(PDOException $e)
 				{
-				$this->errore .= "Errore: ".$e->getMessage()."\n";
+				$this->errore .= "Error: ".$e->getMessage()."\n";
 				}
 			}
 		else
 			{
 			if($cnt < 1)
-				$this->errore .= "Errore: "."Nessun utente trovato"."\n";
+				$this->errore .= "Error: "."No user found"."\n";
 			else 
-				$this->errore .= "Errore: "."Trovati piu utenti"."\n";
+				$this->errore .= "Error: "."Multiple users found"."\n";
+			}
+		return $ok;
+		}
+	protected function SetKeys($id,$prk,$puk)		// Memorizza le chiavi privata e pubblica
+		{
+		$ok = false;
+		try
+			{
+			$this->Connect();
+			$stmt = $this->db->prepare($this->cmd["setkeys"]);
+			$stmt->bindParam(':'.UID,$id);
+			$stmt->bindParam(':'.$this->privKey,$prk);
+			$stmt->bindParam(':'.$this->pubKey,$puk);
+			$ok = $stmt -> execute();
+			$ok = true;
+			}
+		catch(PDOException $e)
+			{
+			$this->errore .= "Error: ".$e->getMessage()."\n";
 			}
 		return $ok;
 		}
@@ -205,7 +248,7 @@ class Crycon						// Classe: connessione criptata
 			}
 		catch(PDOException $e)
 			{
-			$this->errore .= "Errore: ".$e->getMessage()."\n";
+			$this->errore .= "Error: ".$e->getMessage()."\n";
 			$cnt = -1;
 			}
 		return $cnt;
@@ -228,7 +271,7 @@ class Crycon						// Classe: connessione criptata
 			}
 		catch(PDOException $e)
 			{
-			$this->errore .= "Errore: ".$e->getMessage()."\n";
+			$this->errore .= "Error: ".$e->getMessage()."\n";
 			}
 		return $ok;
 		}
@@ -247,7 +290,7 @@ class Crycon						// Classe: connessione criptata
 				}
 			else 
 				{
-				$this->messaggio .= "Disconnesso da altro utente\n";
+				$this->messaggio .= "Disconnected by another user\n";
 				}
 			}
 		return $ok;
@@ -277,18 +320,18 @@ class Crycon						// Classe: connessione criptata
 						}
 					else 
 						{
-						$this->timsg = "errore execute()";
+						$this->timsg = "Error in execute()";
 						}
 					#fare Aggiornare (se necessario) le variabili di sessione LLG ecc...
 					}
 				catch(PDOException $e)
 					{
-					$this->timsg = "Errore: ".$e->getMessage()."\n";
+					$this->timsg = "Error: ".$e->getMessage()."\n";
 					}
 				}
 			else 
 				{
-				$this->timsg = "TEMPO SCADUTO";
+				$this->timsg = "Timeout expired";
 				}
 			}
 		return $ok;
@@ -306,7 +349,7 @@ class Crycon						// Classe: connessione criptata
 			}
 		catch(PDOException $e)
 			{
-			$this->errore .= "Errore: ".$e->getMessage()."\n";
+			$this->errore .= "Error: ".$e->getMessage()."\n";
 			}
 		return $ok;
 		}
@@ -315,7 +358,7 @@ class Crycon						// Classe: connessione criptata
 		if(isset($_SESSION[UID]) && isset($_SESSION[$this->usrname]))	// se login effettuato dalla sessione attiva...
 			{
 			$this->Disconnect();						// ... disconnette
-			$this->messaggio = $p1." DISCONNESSO";
+			$this->messaggio = $p1." disconnected";
 			}
 		else											// Se non connesso nella sessione...
 			{
@@ -334,23 +377,23 @@ class Crycon						// Classe: connessione criptata
 						if($trfr > $this->rtmt)
 							{
 							$this->Disconnect();
-							$this->messaggio = $p1." RIPRISTINATO PER LOGIN";
+							$this->messaggio = $p1." reset for login";
 							}
 						else 
 							{
-							$this->messaggio = $p1." ancora connesso";
+							$this->messaggio = $p1." still connected";
 							}
 						}
 					#fare ATTENZIONE: Disconnect() solo se ok...? VERIFICARE CHE COSA FARE !
 					}
 				else
 					{
-					$this->messaggio = $p1." UTENTE o PASSWORD ERRATI";		// Se credenziali errate...
+					$this->messaggio = $p1." wrong user or password";		// Se credenziali errate...
 					}
 				}
 				catch(PDOException $e)
 					{
-					$this->errore .= "Errore: ".$e->getMessage()."\n";
+					$this->errore .= "Error: ".$e->getMessage()."\n";
 					}
 			}
 		return true;
@@ -385,12 +428,12 @@ class Crycon						// Classe: connessione criptata
 			}
 		catch(PDOException $e)
 			{
-			$this->timsg .= "Errore: ".$e->getMessage()."\n";
+			$this->timsg .= "Error: ".$e->getMessage()."\n";
 			$cnt = -1;
 			}
 		return $cnt;
 		}
-	protected function CmdLogin($p0,$p1,$p2)			// Esegue login
+	protected function CmdLogin($p0,$p1,$p2)			// Esegue login$p1 utente, $p2 hash password (criptato o no)
 		{
 		#fare SE LOGIN CON UTENTE GIA` CONNESSO, IL TIMER PARTE LO STESSO? Correggere
 		#fare SE REFRESH CON UTENTE DISCONNESSO DA ALTRO UTENTE, IL TIMER RESTA ATTIVO.
@@ -398,10 +441,32 @@ class Crycon						// Classe: connessione criptata
 		if($this->IsLogged())
 			{
 			$this->Clear();
-			$this->messaggio = $_SESSION[$this->usrname]." GIA` CONNESSO";
+			$this->messaggio = $_SESSION[$this->usrname]." already connected";
 			return;
 			}
-		$loginOk = $this->GetUserKeys($p1, $p2, $uid, $key, $pwdb);
+		$prK = "";
+		$puK = "";
+		$kOk = $this->GetUserPKs($p1, $puK, $prK);		// Legge le chiavi
+		if(!$kOk)
+			{
+			$this->messaggio = "User not found";
+			$this->Disconnect();
+			}
+		if(strlen($prK) > 1)				// Se la chiave privata non è nulla
+			{
+			try
+				{
+				$p2no64 = base64_decode($p2);					// Decodifica da base64
+				openssl_private_decrypt($p2no64, $dec, $prK);	// Decodifica con chiave privata
+				$p2 = $dec;
+				}
+			catch(Exception $e)
+				{
+				$this->messaggio = "Error in openssl_public_decrypt(): ".$e->getMessage()."\n";
+				$this->Disconnect();
+				}
+			}
+		$loginOk = $this->GetUserKeys($p1, $p2, $uid, $key, $pwdb);		// Legge i dati utente
 		if($loginOk == true)
 			{
 			$lg = $this->CountLoggedUsers($uid);
@@ -418,28 +483,28 @@ class Crycon						// Classe: connessione criptata
 				$ok = $this->InsertLoggedUser($uid,session_id());
 				if(!$ok)
 					{
-					$this->messaggio = "FALLITA REGISTRAZIONE";
+					$this->messaggio = "Storage failed";
 					$this->Disconnect();
 					}
 				else
 					{
 					$this->Clear();			// Se tutto ok, cancella gli errori
-					$this->messaggio = $p1." CONNESSO";
+					$this->messaggio = $p1." connected";
 					}
 				}
 			else if($lg < 0)
 				{
-				$this->messaggio = "ERRORE";
+				$this->messaggio = "ERROR";
 				$this->Disconnect();
 				}
 			else
 				{
-				$this->messaggio = "UTENTE ".$lg." GIA` CONNESSO";
+				$this->messaggio = "User ".$lg." already connected";
 				}
 			}
 		else 
 			{
-			$this->messaggio = $p1." UTENTE o PASSWORD ERRATI";
+			$this->messaggio = $p1."  wrong user or password";
 			$this->Disconnect();
 			}
 		}
@@ -447,12 +512,12 @@ class Crycon						// Classe: connessione criptata
 		{
 		if(isset($_SESSION[UID]) && isset($_SESSION[$this->usrname]))	// se login effettuato...
 			{
-			$this->messaggio = ($_SESSION[$this->usrname])." DISCONNESSO";
+			$this->messaggio = ($_SESSION[$this->usrname])." disconnected";
 			$this->Disconnect();
 			}
 		else		// ...oppure no
 			{
-			$this->messaggio = "Nessun utente connesso. Logout superfluo.";
+			$this->messaggio = "No user connected. Logout unnecessary";
 			$this->Disconnect();
 			}
 		return true;
@@ -517,8 +582,7 @@ class Crycon						// Classe: connessione criptata
 	protected function GenerateRandom($nbyte)			// Stringa crittograficamente sicura, in base64
 		{
 		$s = "";
-		//$x = $this->GenerateSeq($nbyte);				// Per PROVA
-		$x = $this->GenerateRndSeq($nbyte);				// Casuale
+		$x = $this->GenerateRndSeq($nbyte);				// Casuale [Usare $x = $this->GenerateSeq($nbyte) per test]
 		$s = base64_encode($x);
 		return $s;
 		}
@@ -564,7 +628,7 @@ class Crycon						// Classe: connessione criptata
 	public function ProcessRequest($p0,$p1,$p2)			// Analizza la richiesta e la esegue
 		{
 		$done = false;
-		switch($p0)
+		switch($p0)										// Prepara il comando di risposta ed i dati
 			{
 			case CMD_LOGIN:								// Login
 				$done = $this->CmdLogin($p0,$p1,$p2);
@@ -593,7 +657,7 @@ class Crycon						// Classe: connessione criptata
 			case CMD_CONNECT:							// Connessione criptata
 				if($this->IsLogged())
 					{
-					$this->comando = CMD_CONNECT;		// Risposta alla richiesta di connessione
+					$this->comando = CMD_CONNECT;
 					$aestmp = $this->GenerateAES();		// Ottiene un aes temporaneo in base64
 					$_SESSION[$this->ssk] = $aestmp;	// Memorizza l'aes di sessione (single symm key), in base64
 					$risposta = $aestmp.session_id();	// Aggiunge session ID
@@ -604,18 +668,14 @@ class Crycon						// Classe: connessione criptata
 				break;
 			case CMD_AESPK:								// Richiesta chiave pubblica per verifica aes
 				$this->comando = CMD_AESPK;				// Imposta la risposta da inviare
-				$privateKey = openssl_pkey_new(array('private_key_bits' => RSAKEYSIZE,'private_key_type' => OPENSSL_KEYTYPE_RSA,));
-				$privateKeyStr = '';
-				openssl_pkey_export ($privateKey, $privateKeyStr);	// La esporta come stringa
-				$_SESSION['prk'] = $privateKeyStr;					// La memorizza in sessione
-				$a_key = openssl_pkey_get_details($privateKey);		// Estrae i dettagli della chiave...
-				$publicKey = $a_key['key'];							// ...tra cui la chiave pubblica
-				$this->data = $publicKey;							// Invia la chiave pubblica in chiaro
+				$this->GenerateRsaKeys($prK, $puK);
+				$_SESSION[$this->privKey] = $prK;
+				$this->data = $puK;
 				break;
 			case CMD_AES:
 				$this->comando = CMD_AES;
 				$dec = null;
-				$privateKey = openssl_pkey_get_private($_SESSION['prk']);	// Ottiene la chiave privata dalla stringa
+				$privateKey = openssl_pkey_get_private($_SESSION[$this->privKey]);	// Ottiene la chiave privata dalla stringa
 				$p2no64 = base64_decode($p1);								// Traduce la chiave aes criptata da base64
 				openssl_private_decrypt($p2no64, $dec, $privateKey);		// Decodifica la chiave aes con chiave privata 
 				if($_SESSION[$this->ssk] == $dec)							// Verifica
@@ -624,7 +684,7 @@ class Crycon						// Classe: connessione criptata
 					}
 				else
 					{
-					$this->data = "Errore in AES";
+					$this->data = "Error in AES";
 					$this->Disconnect();				// Completare !!!!
 					}
 				break;
@@ -698,24 +758,65 @@ class Crycon						// Classe: connessione criptata
 #		COMANDO SPECIFICO: $JSN[CMD_COMMAND] = "DATI"
 		echo json_encode($jsn);
 		}
-	
-	function ProcessMessage($m)							// Elabora il messaggio e prpara risposta (inizia con comando ed =) 
+	function GenerateRsaKeys(&$prK, &$puK)				// Genera coppia di chiavi (argomenti passati per reference)
+		{
+		$prK = $puK = '';
+		$privateKey = openssl_pkey_new(array('private_key_bits' => RSAKEYSIZE,'private_key_type' => OPENSSL_KEYTYPE_RSA,));
+		openssl_pkey_export ($privateKey, $prK);			// Chiave privata in string
+		$a_key = openssl_pkey_get_details($privateKey);		// Estrae i dettagli della chiave...
+		$puK = $a_key['key'];								// ...tra cui la chiave pubblica
+		}
+	function ProcessMessage($m)							// Elabora il messaggio e prepara risposta (inizia con 'comando=') 
 		{
 		$r = '';
 		switch($m)
 			{
-			case CMD_PRK:
-				$privateKey = openssl_pkey_new(array('private_key_bits' => RSAKEYSIZE,'private_key_type' => OPENSSL_KEYTYPE_RSA,));
-				$privateKeyStr = '';
-				openssl_pkey_export ($privateKey, $privateKeyStr);	// La esporta come stringa
-				$r = CMD_PRK.'='.$privateKeyStr;
+			case CMD_PK:								// Genera nuova coppia di chiavi ed invia la chiave pubblica
+				$this->GenerateRsaKeys($prK, $puK);		// Per reference
+ 				$r = CMD_PK.'='.$puK;
+ 				$_SESSION[$this->privKey] = $prK;		// Le memorizza in sessione
+ 				$_SESSION[$this->pubKey] = $puK;
 				break;
-			default:
-				$r = '000'.'='."Elaborato messaggio:\n".$m."\nOra: ".date("Y-m-d H:i:s",time());
+			case CMD_KOK:								// Memorizza le chiavi nel database
+				if(!isset($_SESSION[$this->privKey]) || !isset($_SESSION[$this->pubKey]))
+					{
+					$r = CMD_KOK.'='."New key not generated yet";
+					break;
+					}
+				$done = $this->SetKeys($_SESSION[UID],$_SESSION[$this->privKey],$_SESSION[$this->pubKey]);
+				if(!$done)
+					{
+					$r = CMD_KOK.'='."Error storing keys";
+					}
+				else 
+					{
+					$r = CMD_KOK.'='."Keys correctly stored";
+					//$_SESSION[$this->privKey] = "";		// Le azzera
+					//$_SESSION[$this->pubKey] = "";
+					unset($_SESSION[$this->privKey]);		// Elimina le chiavi dalla sessione
+					unset($_SESSION[$this->pubKey]);
+					}
+				break;
+			case CMD_RSTK:								// Genera nuova coppia di chiavi ed invia la chiave pubblica
+				$done = $this->SetKeys($_SESSION[UID],"","");
+				if(!$done)
+					{
+					$r = CMD_RSTK.'='."Error resetting keys";
+					}
+				else
+					{
+					$r = CMD_RSTK.'='."Keys correctly reset";
+					unset($_SESSION[$this->privKey]);		// Elimina le chiavi dalla sessione
+					unset($_SESSION[$this->pubKey]);
+					}
+				break;
+			default:									// Ripsonde con un messaggio generico
+				$r = '000'.'='."Message processed:\n".$m."\nOra: ".date("Y-m-d H:i:s",time());
 				break;
 			}
 		return $r;
 		}
 
+		
 	}
 ?>	

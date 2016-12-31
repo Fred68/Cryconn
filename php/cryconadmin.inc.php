@@ -72,7 +72,7 @@ class CryconAdmin extends Crycon				// Classe: connessione criptata da amministr
 				}
 			catch(PDOException $e)
 				{
-				$this->errore .= "<p><b>"."Errore: ".$e->getMessage()."</b></p>";
+				$this->errore .= "<p><b>"."Error: ".$e->getMessage()."</b></p>";
 				}
 			
 			}

@@ -36,23 +36,24 @@ if(!$ret)
 				</tr>
 			</table>
 			<form class="<?php echo ID_UNLOGGED;?>" id="loginform"> 
-			Utente: <input type='text' id='usr' value=''><br>
+			User: <input type='text' id='usr' value=''><br>
 			Password: <input type='password' id='pwd'><br>
 			</form>
 			<button class="<?php echo ID_UNLOGGED;?>" id="<?php echo CMD_LOGIN;?>">Login</button>
 			<button class="<?php echo ID_UNLOGGED;?>" id="<?php echo CMD_CLEAR;?>">Clear</button>			
 			<button class="<?php echo ID_UNLOGGED;?>" id="<?php echo CMD_RELOAD;?>">Reload</button>
+			<button id="<?php echo ID_VKEYS;?>">See puK</button>
 			<button class="<?php echo ID_LOGGED;?>" id="<?php echo CMD_LOGOUT;?>">Logout</button>
-			<input type="file" id="<?php echo ID_FILE;?>" name="<?php echo ID_FILE;?>[]" />
-			<!-- <output id="list"></output>  -->
-			<!-- <a download="<?php echo CMD_PRK;?>" id="<?php echo DWN_PRK;?>">download</a>  -->
+			<p class="<?php echo ID_UNLOGGED;?>">Public key: <input type="file" id="<?php echo ID_FILEPUK;?>" name="<?php echo ID_FILEPUK;?>[]" /></p>
 		</div>
 		<div class="<?php echo ID_LOGGED;?>">
-		<p>Funzioni per l'utente:</p>
+		<p>User functions:</p>
 		<button id="<?php echo ID_TEST;?>">Test</button>
 		<button id="<?php echo ID_COMMAND;?>">Command</button>
-		<button id="<?php echo CMD_PRK;?>">prk</button>
-		<a download="<?php echo CMD_PRK;?>" id="<?php echo DWN_PRK;?>">download</a>
+		<button id="<?php echo CMD_RSTK;?>">Reset keys</button>
+		<button id="<?php echo CMD_PK;?>">New keys</button>
+		<button id="<?php echo CMD_KOK;?>">Confirm keys</button>
+		<a id="<?php echo DWN_PUK;?>">PublicKey</a>
 		</div>
 	</body>
 	</html>

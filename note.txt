@@ -25,41 +25,26 @@
 
 
 	v		Eseguire ShowPage soltanto una volta (al login e dopo il login). Gli altri comandi vanno eseguiti attraverso xlmhttprequest
-	
 		?	Aggiungere controllo del timeout !!!
-	
 		?	Correggere messaggi refresh, per cancellare messaggio ed errore precedenti.
-	
 		?	Separare i messaggi del refresh, in campo html diverso da quello del messaggio, se no lo cancella subito
-	
 		?	Ad ogni refresh, CONTROLLARE IL DATABASE, se l'utente è connesso. 
-	
 		?	Prima di eseguire il Clear Logged, verificare che abbia raggiunto il timeout.
-	
 		?	Attivare e disattivare il timer di refresh se login effettuato o no. Fatto in base a comando in risposta del server.
-	
 	.		Aggiungere poi un secondo timer per refresh locale della pagina.
 			Il timer lungo verifica la connessione
 			Il timer corto interroga il server se ci sono messaggi.
 			Coda di messaggi: da implementare in futuro
-	
 	.		Rifare programma con coda di messaggi e stato.
 			Il client chiede se ci sono messaggi in coda, con un timer + un flag, se un messaggio deve esser controllato subito.
 			Il server ha una coda di messaggi
-			
 	v		Usare direttamente include 'pagine.php' per mostrarla, senza dover leggere il file
-	
 	.		ATTENZIONE: RIPULIRE (sanitize) i POST[] prima di utilizzarli, contro sql injection.
-	
-	.		Vedere cosa fare con sha1(password), dovrebbe contenere solo caratteri alfanumerici
-			
+	.		Vedere cosa fare con sha1(password), dovrebbe contenere solo caratteri alfanumerici			
 	.		Spostare tutti i nomi delle variabili di sessione nelle costanti
-	
 	.		Completare script.php con caricamento script da cdn o locale
-	
 	v		Inserire la chiave AES e salvarla in locale.
 			Usare sessionStorage.
-			
 	.		Studiare due coppie di chiavi asimmetriche, per l'invio sicure della chiave aes
 			Messaggi da client js a server php:
 				js chiede a php una chiave
@@ -80,7 +65,6 @@
 				php genera la chiave aes e la unisce al sid
 				php crittografa aes+sid con la puk e la invia al client
 				js decifra aes+sid con la prk.
-		
 	.		Studiare modo per evitare di generare le chiavi in JS, e per il solo scambio sicuro della chiave aes.
 			Sistema 1:
 			Non sufficiente, manca l'autenticazione, un MITM potrebbe alterare il codice js e sostituire messaggi.
@@ -113,12 +97,11 @@
 			Studiare sistema con autenticazione
 				Server e Client devono scambiarsi, prima e con un canale differente, due coppie di chiavi pubblica e privata.
 				Poi possono usare queste chiavi per scambiarsi la chiave aes oppure per autenticare i messaggi.
-
 	v		Richiedere testo in js e salvarlo in locale. Sì, con Blob e download link.
 	v		Leggere il contenuto di un file in js. Sì, con <input type='file'> e FileReader.
-
-			SISTEMA ATTUALE
-			
+	.		Attenzione: prevedere stati o sequenza di login. In caso di errore di autenticazione o di altro, eseguire logout
+	
+SISTEMA ATTUALE
 			Login:
 			1.	js		Click login : invia CMD_LOGIN + user + l'hash della password 
 			2.	php		Verifica user e pwd, imposta session variables e aggiunge agli utenti connessi.
@@ -139,24 +122,19 @@
 			8.	php		Decifra la chiave AES con la prk.
 						La verifica con quella memorizzata.
 						Risponde con CMD_AES e l'hash dell'AES
-			9.	js		Verifica l'hash della chiave AES memorizzata con quello ricevuto.
-			
-			Comandi:
+			9.	js		Verifica l'hash della chiave AES memorizzata con quello ricevuto.			
+COMANDI:
 			C1.	js		Invia CMD_COMMAND + comando crittografato con AES
 			C2.	php		Decifra il comando, lo esegue. Compone la risposta come comando=testo. La crittografa con chiave AES, ed invia con comando CMD_COMMAND.
 			C3.	js		Riceve CMD_COMMAND. Decifra comando=testo. Elabora il comando.
-			
-			Elaborazione comandi (client js) decifrati:
+ELABORAZIONE COMANDI (CLIENT JS) DECIFRATI
 			default			Mostra il messaggio
-			CMD_PRK			Estrae il testo con la chiave privata. Mostra il link di download, crea un blob con il testo e lo associa al target del link.
-			
-			Elaborazione comandi (server php) decifrati
-			CMD_PRK			Genera chiavi RSA. Invia la chiave privata. [poi deve memorizzare la pubblica e verificare la ricezione corretta dal Client]
-			
-			Pulsanti
-			Prk				Invia CMD_COMMAND con comando CMD_PRK.
-			
-			PUNTI VULNERABILI DEL LOGIN:
+			CMD_PK			Estrae il testo con la chiave privata. Mostra il link di download, crea un blob con il testo e lo associa al target del link.
+ELABORAZIONE COMANDI (SERVER PHP) DECIFRATI
+			CMD_PK			Genera chiavi RSA. Invia la chiave privata. [poi deve memorizzare la pubblica e verificare la ricezione corretta dal Client]
+PULSANTI
+			Prk				Invia CMD_COMMAND con comando CMD_PK.
+PUNTI VULNERABILI DEL LOGIN:
 			1.	js		L'hash può essere riprodotto, bloccando o alterando il login, il clear o il logout. Non vi è autenticazione.
 						- Crittografare l'hash della password con la chiave privata del Client, così l'identificazione è univoca.
 							No, perchè un MITM potrebbe semplicemente memorizzare e reinviare i dati in un secondo tempo.
@@ -176,22 +154,28 @@
 			3.			Un MITM può sostituire il puk con il suo, poi intercettare la risposta del server e sostituirla con la sua.
 					!!!!	PUNTO DEBOLE DI TUTTO IL SISTEMA !
 			6.			Il server risponde con un comando invariante, cha facilita la forzatura della chiave.
-			
-			MODIFICARE LA SEQUENZA COME SEGUE:
-			
+ALTRE VULNERABILITA'
+			1.		sessionStorage
+			2.		Random number generation
+			3.		session id
+			4.		js code (better encrypted)
+			5.		online content data 
+MODIFICARE LA SEQUENZA COME SEGUE:
 			Prima della connessione:
-			-	php			Crea una coppia di chiavi per ogni utente.
-							Consegna in modo sicuro la chiave privata (con operatore) per autenticazione.
-							Memorizza la chiave pubblica nel database.
+			-	php			Crea due coppie di chiavi per ogni utente.
+							Consegna in modo sicuro la chiave privata (della 1° coppia) e la chiave pubblica (della 2° coppia).
+							Memorizza la chiave pubblica della 1° coppia e quella privata della 2° coppia nel database.
 			-	php			In alternativa, con connessione criptata, invia la chiave privata al client.
 			-	js			All'avvio, legge il file con la chiave privata e la memorizza in una variabile del programma, Meglio non in session variable.
 
+			Creare funzioni php e relativi comandi (CMD_COMMAND) per:
+			v Creare coppie di chiavi RSA, in php
+			- Inviare una chiave (pubblica o privata) a js, criptata con chiave aes, in php, da salvare.
+			- Verificare la chiave (pubblica o privata) ricevuta dall'utente (sufficiente hash della chiave), in php e js
+			- Memorizzare una chiave (pubblica o privata) nel database dell'utente
 			Connessione:
 			-	js			
 			
-			
-
-
 			
 			
 			
