@@ -135,6 +135,7 @@ class Crycon						// Classe: connessione criptata
 		}
 	protected function CountUsers($uname, $upwd)		// Conta gli utenti con nome e hash della password. -1 se errore.
 		{
+		// SANITIZE
 		$cnt = 0;
 		try
 			{
@@ -157,6 +158,7 @@ class Crycon						// Classe: connessione criptata
 		$ok = false;
 		$puk = "";
 		$prk = "";
+		// SANITIZE
 		try
 			{
 			$this->Connect();									// Connette, se necessario, ma non disconnette
@@ -185,6 +187,7 @@ class Crycon						// Classe: connessione criptata
 		$id = "";
 		$key = "";
 		$pwdb = "";
+		// SANITIZE
 		$cnt = $this->CountUsers($uname, $upwd);
 		if($cnt == 1)		// Converte. Non usare ===.
 			{
@@ -219,6 +222,7 @@ class Crycon						// Classe: connessione criptata
 	protected function SetKeys($id,$prk,$puk)		// Memorizza le chiavi privata e pubblica
 		{
 		$ok = false;
+		// SANITIZE
 		try
 			{
 			$this->Connect();
@@ -238,6 +242,7 @@ class Crycon						// Classe: connessione criptata
 	protected function CountLoggedUsers($uid)			// Conta gli utenti connessi con $userID. -1 se errore
 		{
 		$cnt = 0;
+		// SANITIZE
 		try
 			{
 			$this->Connect();
@@ -256,6 +261,7 @@ class Crycon						// Classe: connessione criptata
 	protected function InsertLoggedUser($id,$sid)		// Inserisce logged user
 		{
 		$ok = false;
+		// SANITIZE
 		try
 			{
 			$this->Connect();
@@ -298,6 +304,7 @@ class Crycon						// Classe: connessione criptata
 	protected function RefreshLoggedUser()				// Refresh con aggiornamento dell'utente logged
 		{
 		$ok = false;
+		// SANITIZE
 		if($this->IsLogged())							// Se è connesso...
 			{
 			$id = $_SESSION[UID];							// Legge l'uid dell'utente !
@@ -339,6 +346,7 @@ class Crycon						// Classe: connessione criptata
 	protected function RemoveLoggedUser($id)			// Rimuove l'utente con $id dagli utenti collegati
 		{
 		$ok = false;
+		// SANITIZE
 		try
 			{
 			$this->Connect();
@@ -400,7 +408,8 @@ class Crycon						// Classe: connessione criptata
 		}
 	protected function CheckUser($uid, &$dtrefr, &$dttot) 	// true se l'utente è connesso e nel timeout
 		{
-		$cnt = 0;										
+		$cnt = 0;
+		// SANITIZE
 		try
 			{
 			$this->Connect();
@@ -603,6 +612,7 @@ class Crycon						// Classe: connessione criptata
 			$p1 = $_POST[P1];
 			$p2 = $_POST[P2];
 			$ok = true;
+			// error_log("p0=".$p0." p1=".$p1." p2=".$p2);
 			}
 		return $ok;
 		}
@@ -625,13 +635,17 @@ class Crycon						// Classe: connessione criptata
 		$dec  = openssl_decrypt($enc, $method, $aes, false, $iv);
 		return $dec;
 		}
+	protected function FilterText(&$txt)
+		{
+		return preg_replace("/[^a-zA-Z0-9]/","",$txt);	
+		}
 	public function ProcessRequest($p0,$p1,$p2)			// Analizza la richiesta e la esegue
 		{
 		$done = false;
 		switch($p0)										// Prepara il comando di risposta ed i dati
 			{
 			case CMD_LOGIN:								// Login
-				$done = $this->CmdLogin($p0,$p1,$p2);
+				$done = $this->CmdLogin($p0,$this->FilterText($p1),$p2);
 				if($this->IsLogged())					// Se connesso,
 					{
 					$this->comando = ID_START;			// Richiede start timer in js
@@ -639,10 +653,10 @@ class Crycon						// Classe: connessione criptata
 					}
 				break;
 			case CMD_CLEAR:
-				$done = $this->CmdClear($p0,$p1,$p2);
+				$done = $this->CmdClear($p0,$this->FilterText($p1),$p2);
 				break;
 			case CMD_LOGOUT:
-				$done = $this->CmdLogout($p0,$p1,$p2);	// Esegue logout
+				$done = $this->CmdLogout($p0,$this->FilterText($p1),$p2);	// Esegue logout
 				$this->comando = ID_STOP;				// e richiede stop timer
 				break;
 			case CMD_REFRESH:

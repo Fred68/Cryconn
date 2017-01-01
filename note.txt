@@ -39,7 +39,7 @@
 			Il client chiede se ci sono messaggi in coda, con un timer + un flag, se un messaggio deve esser controllato subito.
 			Il server ha una coda di messaggi
 	v		Usare direttamente include 'pagine.php' per mostrarla, senza dover leggere il file
-	.		ATTENZIONE: RIPULIRE (sanitize) i POST[] prima di utilizzarli, contro sql injection.
+	v		Ripulite alcuni post contro sql injection.
 	.		Vedere cosa fare con sha1(password), dovrebbe contenere solo caratteri alfanumerici			
 	.		Spostare tutti i nomi delle variabili di sessione nelle costanti
 	.		Completare script.php con caricamento script da cdn o locale
